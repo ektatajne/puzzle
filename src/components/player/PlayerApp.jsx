@@ -636,7 +636,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       return "game_ended";
     }
 
-    // 1. FINAL WINNER OVERRIDE (Must NEVER be overwritten by eliminated!)
+    // 1. FINAL WINNER OVERRIDE
     if (
       tournamentStatus === "WINNER" ||
       gameState.finalWinner?.id === playerId ||
@@ -645,40 +645,46 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       return "tournament_winner";
     }
 
-    // 2. RESULT / ROUND COMPLETE PHASE (Shows per-round result screen for completers)
+    // 2. PUZZLE SOLVED / COMPLETED OVERRIDE (COMPLETERS MUST NEVER SHOW ELIMINATED!)
+    if (isCompleted || roundResultData || (solveTimeRecord !== null && solveTimeRecord > 0)) {
+      if (
+        gameState.phase === "RESULT" ||
+        gameState.phase === "ROUND_COMPLETE" ||
+        gameState.phase === "FINAL_RESULTS"
+      ) {
+        return "round_result";
+      }
+      return "completed_waiting";
+    }
+
+    // 3. RESULT / ROUND COMPLETE PHASE FOR NON-COMPLETERS
     if (
       gameState.phase === "RESULT" ||
       gameState.phase === "ROUND_COMPLETE" ||
       gameState.phase === "FINAL_RESULTS"
     ) {
-      if (isCompleted || roundResultData || (solveTimeRecord !== null && solveTimeRecord > 0)) {
-        return "round_result";
-      }
       if (tournamentStatus === "ELIMINATED") {
         return "eliminated";
       }
       return "did_not_finish";
     }
 
-    // 3. ELIMINATED (Only if not winner or in result phase)
+    // 4. ELIMINATED (Only for non-completers)
     if (tournamentStatus === "ELIMINATED") {
       return "eliminated";
     }
 
-    // 4. PUZZLE PHASE COMPLETION & PLAYING STATUSES
+    // 5. PUZZLE PHASE PLAYING STATUS
     if (gameState.phase === "PUZZLE") {
-      if (isCompleted) {
-        return "completed_waiting";
-      }
       return "playing";
     }
 
-    // 5. PRE-REVEAL / MEMORY / COUNTDOWN PHASES
+    // 6. PRE-REVEAL / MEMORY / COUNTDOWN PHASES
     if (gameState.phase === "ROUND_STARTING") return "get_ready";
     if (gameState.phase === "MEMORY") return "memorizing";
     if (gameState.phase === "COUNTDOWN") return "countdown";
 
-    // 6. LOBBY / WAITING BETWEEN ROUNDS
+    // 7. LOBBY / WAITING BETWEEN ROUNDS
     if (gameState.phase === "LOBBY" || gameState.phase === "WAITING") {
       if (gameState.round > 1 && (tournamentStatus === "ACTIVE" || tournamentStatus === "ADVANCED")) {
         return "advancing";
@@ -1135,7 +1141,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
     const topWinnerObj = roundCompleters.length > 0 ? roundCompleters[0] : (roundLeaderboard.length > 0 ? roundLeaderboard[0] : null);
     const winnerNameStr = topWinnerObj ? (topWinnerObj.name || topWinnerObj.player_name || "Player") : name;
     const winnerTimeSec = topWinnerObj ? Number(topWinnerObj.completion_time || topWinnerObj.time || solveTimeRecord || 0) : Number(solveTimeRecord || 0);
-    const isMeWinner = topWinnerObj && (topWinnerObj.player_id === playerId || topWinnerObj.id === playerId);
+    const isMeWinner = !topWinnerObj || (topWinnerObj.player_id === playerId || topWinnerObj.id === playerId);
 
     return (
       <div className="player-mobile-shell center-wrapper">
