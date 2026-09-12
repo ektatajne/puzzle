@@ -11,6 +11,14 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
   // Read stored session from localStorage across browser refreshes
   const getInitialSession = () => {
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      // If URL explicitly requests a fresh join form or reset
+      if (urlParams.get("new") === "1" || urlParams.get("reset") === "1" || urlParams.get("fresh") === "1") {
+        localStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(`mr_player_${roomCode}`);
+        return null;
+      }
+
       const stored = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(`mr_player_${roomCode}`);
       if (stored) {
         return JSON.parse(stored);
@@ -128,22 +136,36 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       if (!initialSession?.id || !initialSession?.name) return;
 
       try {
-        // Unconditionally preserve player identity & joined state
+        const activeGame = await fetchActiveGameStateFromDb(roomCode);
+        const currentGameId = activeGame?.gameId || gameState.gameId;
+
+        // If stored session belongs to a different game session (admin reset or started new game), prompt for new name entry
+        if (initialSession.gameId && currentGameId && initialSession.gameId !== currentGameId) {
+          console.log("Game session ID changed. Clearing old session for new game.");
+          localStorage.removeItem(SESSION_KEY);
+          sessionStorage.removeItem(`mr_player_${roomCode}`);
+          setJoined(false);
+          setPlayerId(null);
+          setName("");
+          return;
+        }
+
+        // Unconditionally preserve player identity & joined state for current game
         setJoined(true);
         setPlayerId(initialSession.id);
         setName(initialSession.name);
 
-        // Always re-sync player record in DB to guarantee presence & table entry
+        // Re-sync player record in DB
         await joinPlayerInDb({
           roomCode,
           name: initialSession.name,
           employeeId: initialSession.employeeId || "",
           tcsUnit: initialSession.tcsUnit || "",
           playerId: initialSession.id,
-          gameId: gameState.gameId
+          gameId: currentGameId
         });
 
-        const activePlayers = await fetchActivePlayers(roomCode, gameState.gameId);
+        const activePlayers = await fetchActivePlayers(roomCode, currentGameId);
         const playerRecord = activePlayers ? activePlayers.find((p) => p.id === initialSession.id) : null;
 
         if (playerRecord && playerRecord.tournament_status) {
@@ -152,13 +174,14 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
         }
 
         // Check if player has already submitted a result for current round
-        const dbResults = await fetchRoundResults(roomCode, gameState.round, gameState.gameId);
+        const dbResults = await fetchRoundResults(roomCode, gameState.round, currentGameId);
         const myResult = dbResults ? dbResults.find((r) => r.player_id === initialSession.id || r.id === initialSession.id) : null;
         if (myResult) {
           setIsCompleted(true);
+          hasSubmittedResultRef.current = true;
           setMyRank(myResult.rank);
           setMyScore(myResult.score);
-          setSolveTimeRecord(myResult.time || myResult.completion_time);
+          setSolveTimeRecord(Number(myResult.time || myResult.completion_time));
         }
       } catch (err) {
         console.warn("Session reconnect notice:", err);
@@ -365,6 +388,18 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
     };
   }, [roomCode, playerId, joined, name, gameState.gameId]);
 
+  // Fallback piece initialization when entering PUZZLE phase if pieces state is empty
+  useEffect(() => {
+    if (gameState.phase === "PUZZLE" && playerId && tournamentStatus !== "ELIMINATED" && pieces.length === 0) {
+      const currentRound = gameState.round || 1;
+      const seedStr = `${roomCode}-${currentRound}-${playerId}`;
+      const newPieces = createPuzzlePieces(gameState.pieces || 16, seedStr);
+      setPieces(newPieces);
+      setMoveCount(0);
+      puzzleInitializedRoundRef.current = currentRound;
+    }
+  }, [gameState.phase, gameState.round, gameState.pieces, playerId, roomCode, pieces.length, tournamentStatus]);
+
   // Server authoritative timer calculation
   useEffect(() => {
     if (isCompleted && solveTimeRecord !== null) return;
@@ -423,7 +458,8 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       const sessionData = {
         id: confirmedPlayerId,
         name: trimmedName,
-        roomCode
+        roomCode,
+        gameId: gameState.gameId
       };
 
       localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
@@ -1387,6 +1423,30 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
         <p className="all-set-text">You're all set.</p>
         <p className="waiting-host-note">Waiting for the host to start the challenge...</p>
+
+        <button
+          onClick={() => {
+            localStorage.removeItem(SESSION_KEY);
+            sessionStorage.removeItem(`mr_player_${roomCode}`);
+            setJoined(false);
+            setPlayerId(null);
+            setName("");
+          }}
+          style={{
+            margin: "12px auto 16px",
+            display: "block",
+            background: "rgba(255, 255, 255, 0.08)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            color: "#e2e8f0",
+            padding: "8px 16px",
+            borderRadius: "20px",
+            fontSize: "0.8rem",
+            fontWeight: "700",
+            cursor: "pointer"
+          }}
+        >
+          ✏️ EDIT NAME / RE-REGISTER
+        </button>
 
         <div className="connection-status-pill">
           <span className="dot online" />
