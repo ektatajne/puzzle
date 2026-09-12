@@ -125,56 +125,43 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
   // Session validation and auto-reconnect on initial page load/refresh
   useEffect(() => {
     async function validateAndReconnectSession() {
-      if (!initialSession?.id) return;
+      if (!initialSession?.id || !initialSession?.name) return;
 
       try {
+        // Unconditionally preserve player identity & joined state
+        setJoined(true);
+        setPlayerId(initialSession.id);
+        setName(initialSession.name);
+
+        // Always re-sync player record in DB to guarantee presence & table entry
+        await joinPlayerInDb({
+          roomCode,
+          name: initialSession.name,
+          employeeId: initialSession.employeeId || "",
+          tcsUnit: initialSession.tcsUnit || "",
+          playerId: initialSession.id,
+          gameId: gameState.gameId
+        });
+
         const activePlayers = await fetchActivePlayers(roomCode, gameState.gameId);
         const playerRecord = activePlayers ? activePlayers.find((p) => p.id === initialSession.id) : null;
 
-        if (playerRecord) {
-          if (playerRecord.tournament_status) {
-            setTournamentStatus(playerRecord.tournament_status);
-            if (playerRecord.eliminated_in_round) setEliminatedInRound(playerRecord.eliminated_in_round);
-          }
+        if (playerRecord && playerRecord.tournament_status) {
+          setTournamentStatus(playerRecord.tournament_status);
+          if (playerRecord.eliminated_in_round) setEliminatedInRound(playerRecord.eliminated_in_round);
+        }
 
-          // Player record exists: reconnect session in DB
-          await joinPlayerInDb({
-            roomCode,
-            name: playerRecord.name || initialSession.name,
-            employeeId: playerRecord.employee_id || initialSession.employeeId,
-            tcsUnit: playerRecord.tcs_unit || initialSession.tcsUnit,
-            playerId: initialSession.id,
-            gameId: gameState.gameId
-          });
-
-          // Check if player has already submitted a result for current round
-          const dbResults = await fetchRoundResults(roomCode, gameState.round, gameState.gameId);
-          const myResult = dbResults ? dbResults.find((r) => r.player_id === initialSession.id || r.id === initialSession.id) : null;
-          if (myResult) {
-            setIsCompleted(true);
-            setMyRank(myResult.rank);
-            setMyScore(myResult.score);
-            setSolveTimeRecord(myResult.time || myResult.completion_time);
-          }
-        } else {
-          // Player record was deleted or belongs to a previous game: clear local session to render fresh join form
-          localStorage.removeItem(SESSION_KEY);
-          sessionStorage.removeItem(`mr_player_${roomCode}`);
-          setJoined(false);
-          setPlayerId(null);
-          setName("");
-          setEmployeeId("");
-          setTcsUnit("");
+        // Check if player has already submitted a result for current round
+        const dbResults = await fetchRoundResults(roomCode, gameState.round, gameState.gameId);
+        const myResult = dbResults ? dbResults.find((r) => r.player_id === initialSession.id || r.id === initialSession.id) : null;
+        if (myResult) {
+          setIsCompleted(true);
+          setMyRank(myResult.rank);
+          setMyScore(myResult.score);
+          setSolveTimeRecord(myResult.time || myResult.completion_time);
         }
       } catch (err) {
-        console.warn("Session restore error, falling back to join form:", err);
-        localStorage.removeItem(SESSION_KEY);
-        sessionStorage.removeItem(`mr_player_${roomCode}`);
-        setJoined(false);
-        setPlayerId(null);
-        setName("");
-        setEmployeeId("");
-        setTcsUnit("");
+        console.warn("Session reconnect notice:", err);
       }
     }
 
