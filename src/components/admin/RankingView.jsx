@@ -23,25 +23,34 @@ export function RankingView({ roomCode = "EXPO26", players = [], results = [], g
   // Cross-reference all room players against round results
   const completedList = [];
   const uncompletedList = [];
+  const processedResultIds = new Set();
 
   players.forEach((player) => {
-    const matchedResult = roundResults.find(
-      (r) =>
-        r.id === player.id ||
-        r.player_id === player.id ||
-        (r.name && player.name && r.name.toLowerCase() === player.name.toLowerCase()) ||
-        (r.player_name && player.name && r.player_name.toLowerCase() === player.name.toLowerCase())
-    );
+    const pId = player.id ? player.id.toString().toLowerCase() : "";
+    const pName = player.name ? player.name.toString().toLowerCase() : "";
 
-    if (matchedResult) {
+    const matchedResult = roundResults.find((r) => {
+      const rId = r.id ? r.id.toString().toLowerCase() : "";
+      const rPlayerId = r.player_id ? r.player_id.toString().toLowerCase() : "";
+      const rName = r.player_name ? r.player_name.toString().toLowerCase() : r.name ? r.name.toString().toLowerCase() : "";
+
+      return (
+        (rPlayerId && rPlayerId === pId) ||
+        (rId && rId === pId) ||
+        (rName && rName === pName)
+      );
+    });
+
+    if (matchedResult || player.status === "COMPLETED") {
+      if (matchedResult) processedResultIds.add(matchedResult.id || matchedResult.player_id);
       completedList.push({
         player,
         result: matchedResult,
         isCompleted: true,
-        name: getNameStr(matchedResult) || getNameStr(player),
-        time: getTimeVal(matchedResult),
-        score: matchedResult.score || 100,
-        round: getRoundNum(matchedResult)
+        name: matchedResult ? getNameStr(matchedResult) : getNameStr(player),
+        time: matchedResult ? getTimeVal(matchedResult) : 45,
+        score: matchedResult?.score || 100,
+        round: matchedResult ? getRoundNum(matchedResult) : (selectedRound !== "ALL" ? Number(selectedRound) : (gameState.round || 1))
       });
     } else {
       uncompletedList.push({
@@ -56,7 +65,23 @@ export function RankingView({ roomCode = "EXPO26", players = [], results = [], g
     }
   });
 
-  // Sort completed players by solve time ascending (fastest first!)
+  // Include any extra round_results that were not matched to players list
+  roundResults.forEach((r) => {
+    const rKey = r.id || r.player_id;
+    if (rKey && !processedResultIds.has(rKey)) {
+      completedList.push({
+        player: { id: r.player_id || r.id, name: getNameStr(r) },
+        result: r,
+        isCompleted: true,
+        name: getNameStr(r),
+        time: getTimeVal(r),
+        score: r.score || 100,
+        round: getRoundNum(r)
+      });
+    }
+  });
+
+  // Sort completed players by solve time ascending (fastest first = rank 1)
   completedList.sort((a, b) => a.time - b.time);
   completedList.forEach((item, idx) => {
     item.rank = idx + 1;
@@ -65,7 +90,7 @@ export function RankingView({ roomCode = "EXPO26", players = [], results = [], g
   // Winner is #1 completed solver
   const winner = completedList.length > 0 ? completedList[0] : null;
 
-  // Combine lists: completed at top (sorted), uncompleted at bottom
+  // Combine lists: completed at top (sorted by fast time), uncompleted at bottom
   const allRankings = [...completedList, ...uncompletedList];
 
   return (
@@ -242,7 +267,7 @@ export function RankingView({ roomCode = "EXPO26", players = [], results = [], g
                             </span>
                           ) : (
                             <span className="status-badge badge-completed px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              ✓ COMPLETED
+                              ✓ COMPLETED (Rd {round})
                             </span>
                           )
                         ) : isRoundActive ? (

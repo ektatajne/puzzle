@@ -293,6 +293,8 @@ export async function saveRoundResultInDb({
   if (!playerId || !time) return null;
 
   try {
+    const solveTime = Number(Number(time).toFixed(2));
+
     // 1. IDEMPOTENCY GUARD: Check if player ALREADY has a recorded result for this round
     if (supabase) {
       const { data: existingRecord } = await supabase
@@ -304,25 +306,24 @@ export async function saveRoundResultInDb({
         .maybeSingle();
 
       if (existingRecord) {
-        // Player already finalized result. Return existing record without overwriting!
         return existingRecord;
       }
     }
 
-    // 2. Calculate authoritative rank by counting existing DB results for this room & round
-    let existingCount = 0;
+    // 2. Calculate rank by sorting all results (existing + new) by completion_time ASC
+    let existingResults = [];
     if (supabase) {
-      const { data: existingResults } = await supabase
+      const { data: dbRes } = await supabase
         .from("round_results")
-        .select("id")
+        .select("completion_time")
         .eq("room_code", roomCode)
         .eq("round_number", roundNumber);
 
-      if (existingResults) existingCount = existingResults.length;
+      if (dbRes) existingResults = dbRes;
     }
 
-    const rank = existingCount + 1;
-    // Score rules: 1st = 100, 2nd = 80, 3rd = 65, 4th = 50, 5th = 40, 6th+ = 25
+    const times = [...existingResults.map(r => Number(r.completion_time || 0)), solveTime].sort((a, b) => a - b);
+    const rank = Math.max(1, times.indexOf(solveTime) + 1);
     const score = rank === 1 ? 100 : rank === 2 ? 80 : rank === 3 ? 65 : rank === 4 ? 50 : rank === 5 ? 40 : 25;
 
     const newRecord = {
@@ -331,7 +332,7 @@ export async function saveRoundResultInDb({
       player_name: playerName.trim(),
       room_code: roomCode,
       round_number: roundNumber,
-      completion_time: Number(time),
+      completion_time: solveTime,
       score: score,
       rank: rank,
       completed_at: new Date().toISOString()
@@ -415,7 +416,7 @@ export async function evaluateTournamentRound({
   // 1. Identify players who were active coming into this round
   const roundActivePlayers = allPlayers.filter((p) => {
     const tourneyStatus = p.tournament_status || "ACTIVE";
-    return tourneyStatus === "ACTIVE" || tourneyStatus === "ADVANCED";
+    return tourneyStatus === "ACTIVE" || tourneyStatus === "ADVANCED" || p.status === "COMPLETED";
   });
 
   if (roundActivePlayers.length === 0) {
@@ -450,11 +451,11 @@ export async function evaluateTournamentRound({
       );
     });
 
-    if (res && Number(res.completion_time || res.time || 0) > 0) {
+    if ((res && Number(res.completion_time || res.time || 0) > 0) || player.status === "COMPLETED") {
       completedList.push({
         player,
-        result: res,
-        time: Number(res.completion_time || res.time || 0)
+        result: res || { completion_time: 45, player_id: player.id, name: player.name },
+        time: Number(res?.completion_time || res?.time || 45)
       });
     } else {
       timedOutList.push(player);
@@ -466,19 +467,9 @@ export async function evaluateTournamentRound({
 
   // RULE: ALL COMPLETED PLAYERS ADVANCE!
   const advancing = completedList.map((item) => item.player);
-  // ONLY TIMED OUT PLAYERS ARE ELIMINATED!
-  let eliminated = timedOutList;
-  let finalWinner = null;
-
-  // Determine final winner guard (e.g. if single active player or single solver remaining)
-  if (roundActivePlayers.length === 1 && completedList.length > 0) {
-    finalWinner = completedList[0].player;
-  } else if (completedList.length === 1 && timedOutList.length === roundActivePlayers.length - 1) {
-    finalWinner = completedList[0].player;
-  }
-
+  
   // HARD GUARD: Completed players are NEVER in eliminated array!
-  eliminated = eliminated.filter((p) => {
+  let eliminated = timedOutList.filter((p) => {
     const pIdLower = p.id ? p.id.toString().toLowerCase() : "";
     const pNameLower = p.name ? p.name.toString().toLowerCase() : "";
     return !completedList.some((c) => {
@@ -487,6 +478,13 @@ export async function evaluateTournamentRound({
       return (cIdLower && cIdLower === pIdLower) || (cNameLower && cNameLower === pNameLower);
     });
   });
+
+  let finalWinner = null;
+  if (roundActivePlayers.length === 1 && completedList.length > 0) {
+    finalWinner = completedList[0].player;
+  } else if (completedList.length === 1 && timedOutList.length === roundActivePlayers.length - 1) {
+    finalWinner = completedList[0].player;
+  }
 
   // Write updated statuses in Postgres DB
   if (supabase) {

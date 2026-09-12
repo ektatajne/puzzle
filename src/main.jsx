@@ -269,25 +269,60 @@ function RootApp() {
     });
 
     broadcastChannel.on("broadcast", { event: "finish" }, ({ payload }) => {
+      const solveTime = Number(payload.time || payload.completion_time || 0);
+
       setResults((prev) => {
         if (prev.some((r) => r.id === payload.id || (r.player_id === payload.player_id && r.player_id))) return prev;
-        const existingRank = prev.length + 1;
-        const scoreEarned = existingRank === 1 ? 100 : existingRank === 2 ? 80 : existingRank === 3 ? 65 : 50;
-        const newRes = { ...payload, rank: existingRank, score: scoreEarned, time: payload.time || payload.completion_time };
+
+        const updatedList = [...prev, { ...payload, time: solveTime, completion_time: solveTime }].sort(
+          (a, b) => Number(a.time || a.completion_time || 0) - Number(b.time || b.completion_time || 0)
+        );
+
+        const myIndex = updatedList.findIndex(
+          (r) => r.id === payload.id || (r.player_id === payload.player_id && r.player_id)
+        );
+        const derivedRank = myIndex !== -1 ? myIndex + 1 : updatedList.length;
+        const scoreEarned = derivedRank === 1 ? 100 : derivedRank === 2 ? 80 : derivedRank === 3 ? 65 : 50;
+
+        const newRes = {
+          ...payload,
+          rank: derivedRank,
+          score: scoreEarned,
+          time: solveTime,
+          completion_time: solveTime
+        };
 
         broadcastChannel.send({ type: "broadcast", event: "result", payload: newRes });
 
-        if (existingRank === 1) {
-          addToast(`🏆 ${payload.name || payload.player_name} finished #1 in ${Number(payload.time || payload.completion_time).toFixed(2)}s!`, "trophy");
+        if (derivedRank === 1) {
+          addToast(`🏆 ${payload.name || payload.player_name} finished #1 in ${solveTime.toFixed(2)}s!`, "trophy");
         } else {
-          addToast(`✓ ${payload.name || payload.player_name} finished in ${Number(payload.time || payload.completion_time).toFixed(2)}s`, "success");
+          addToast(`✓ ${payload.name || payload.player_name} finished in ${solveTime.toFixed(2)}s`, "success");
         }
 
-        return [...prev, newRes].sort((a, b) => (a.time || a.completion_time) - (b.time || b.completion_time));
+        return updatedList.map((item, idx) => ({
+          ...item,
+          rank: idx + 1,
+          score: idx === 0 ? 100 : idx === 1 ? 80 : idx === 2 ? 65 : 50
+        }));
       });
 
       setPlayers((prev) =>
-        prev.map((p) => (p.id === payload.id || p.id === payload.player_id ? { ...p, status: "COMPLETED" } : p))
+        prev.map((p) => {
+          const pId = (p.id || "").toString().toLowerCase();
+          const targetId = (payload.player_id || payload.id || "").toString().toLowerCase();
+          const pName = (p.name || "").toString().toLowerCase();
+          const targetName = (payload.name || payload.player_name || "").toString().toLowerCase();
+
+          if ((pId && pId === targetId) || (pName && pName === targetName)) {
+            return {
+              ...p,
+              status: "COMPLETED",
+              tournament_status: p.tournament_status === "WINNER" ? "WINNER" : "ACTIVE"
+            };
+          }
+          return p;
+        })
       );
     });
 

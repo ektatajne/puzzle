@@ -646,8 +646,24 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       return "tournament_winner";
     }
 
+    // Local storage completion check guard
+    const checkLocalCompleted = () => {
+      if (isCompleted || (solveTimeRecord !== null && solveTimeRecord > 0) || roundResultData) return true;
+      try {
+        const pKey = `mr_puzzle_${roomCode}_${gameState.round || 1}_${playerId}`;
+        const raw = localStorage.getItem(pKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.isCompleted) return true;
+        }
+      } catch (e) {}
+      return false;
+    };
+
+    const playerIsCompleted = checkLocalCompleted();
+
     // 2. PUZZLE SOLVED / COMPLETED OVERRIDE (COMPLETERS MUST NEVER SHOW ELIMINATED!)
-    if (isCompleted || roundResultData || (solveTimeRecord !== null && solveTimeRecord > 0)) {
+    if (playerIsCompleted) {
       if (
         gameState.phase === "RESULT" ||
         gameState.phase === "ROUND_COMPLETE" ||
@@ -878,12 +894,10 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           <div className="success-check-icon" style={{ background: "rgba(239, 68, 68, 0.2)", border: "2px solid rgba(239, 68, 68, 0.6)", color: "#f87171" }}>
             ❌
           </div>
-          <h1 className="joined-title" style={{ color: "#f87171" }}>YOU HAVE BEEN ELIMINATED</h1>
-          <h2>Thanks for playing, {name}!</h2>
+          <h1 className="joined-title" style={{ color: "#f87171" }}>TIME'S UP</h1>
+          <h2>YOU ARE ELIMINATED</h2>
           <p style={{ color: "#cbd5e1", fontSize: "0.9rem", marginTop: "8px", lineHeight: "1.4" }}>
-            You were eliminated in <strong>Round {eliminatedInRound || gameState.round}</strong>.
-            <br />
-            The tournament is continuing with the advancing players.
+            Puzzle was not completed within the time limit for <strong>Round {eliminatedInRound || gameState.round}</strong>.
           </p>
           <div className="connection-status-pill" style={{ marginTop: "24px" }}>
             <span className="dot offline" />
@@ -912,11 +926,11 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           </div>
 
           <h1 className="joined-title" style={{ color: "#f87171" }}>
-            TIME OUT!
+            TIME'S UP
           </h1>
 
           <p style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc", margin: "8px 0 14px" }}>
-            Time Expired — You didn't finish in time.
+            YOU ARE ELIMINATED
           </p>
 
           <div
@@ -931,7 +945,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
               lineHeight: "1.4"
             }}
           >
-            The round timer ran out before your puzzle was completed.
+            Puzzle was not completed within the time limit.
           </div>
 
           {roundCompleters.length > 0 && (
@@ -984,14 +998,8 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
   // 3.5. PER-ROUND RESULT SCREEN (Shown at round end for all players who completed)
   if (effectiveStatus === "round_result") {
     const rankNum = roundResultData?.rank || myRank || 1;
-    const totalComp = roundResultData?.totalCompleters || Math.max(1, roomPlayers.length);
     const timeSec = roundResultData?.solveTime || solveTimeRecord || 0;
     const isFirstPlace = rankNum === 1;
-    const isEliminated = tournamentStatus === "ELIMINATED";
-
-    const topWinnerObj = roundCompleters.length > 0 ? roundCompleters[0] : (roundLeaderboard.length > 0 ? roundLeaderboard[0] : null);
-    const winnerNameStr = topWinnerObj ? (topWinnerObj.name || topWinnerObj.player_name || "Player") : name;
-    const winnerTimeSec = topWinnerObj ? Number(topWinnerObj.completion_time || topWinnerObj.time || timeSec) : Number(timeSec);
 
     return (
       <div className="player-mobile-shell center-wrapper">
@@ -1000,8 +1008,6 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           style={{
             borderColor: isFirstPlace
               ? "rgba(245, 158, 11, 0.6)"
-              : isEliminated
-              ? "rgba(239, 68, 68, 0.5)"
               : "rgba(124, 92, 255, 0.5)"
           }}
         >
@@ -1010,74 +1016,44 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
             style={{
               background: isFirstPlace
                 ? "rgba(245, 158, 11, 0.2)"
-                : isEliminated
-                ? "rgba(239, 68, 68, 0.2)"
                 : "rgba(124, 92, 255, 0.2)",
               border: isFirstPlace
                 ? "2px solid rgba(245, 158, 11, 0.6)"
-                : isEliminated
-                ? "2px solid rgba(239, 68, 68, 0.6)"
                 : "2px solid rgba(124, 92, 255, 0.6)",
-              color: isFirstPlace ? "#fbbf24" : isEliminated ? "#f87171" : "#a78bfa",
+              color: isFirstPlace ? "#fbbf24" : "#a78bfa",
               fontSize: "2.5rem"
             }}
           >
-            {isFirstPlace ? "🏆" : isEliminated ? "⏱️" : "📊"}
+            {isFirstPlace ? "🏆" : "🥇"}
           </div>
 
-          <h1 className="joined-title" style={{ color: isFirstPlace ? "#fbbf24" : isEliminated ? "#f87171" : "#a78bfa" }}>
-            {isFirstPlace ? "YOU ARE THE WINNER!" : `ROUND RESULT — RANK #${rankNum}`}
+          <h1 className="joined-title" style={{ color: isFirstPlace ? "#fbbf24" : "#a78bfa" }}>
+            ROUND {gameState.round || 1} COMPLETE
           </h1>
 
-          {/* CURRENT ROUND WINNER BANNER */}
-          <div
-            style={{
-              background: isFirstPlace ? "linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(15, 23, 42, 0.7))" : "linear-gradient(135deg, rgba(124, 92, 255, 0.25), rgba(15, 23, 42, 0.7))",
-              border: isFirstPlace ? "1px solid rgba(245, 158, 11, 0.6)" : "1px solid rgba(124, 92, 255, 0.5)",
-              borderRadius: "14px",
-              padding: "14px 16px",
-              margin: "12px 0 16px",
-              textAlign: "center"
-            }}
-          >
-            {isFirstPlace ? (
-              <div>
-                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
-                  🏆 YOU ARE THE WINNER!
-                </div>
-                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
-                  👑 {name}
-                </div>
-                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
-                  ⏱️ Fastest Time: {Number(timeSec).toFixed(2)}s
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
-                  🏆 ROUND {gameState.round} WINNER
-                </div>
-                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
-                  👑 {winnerNameStr}
-                </div>
-                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
-                  ⏱️ Winning Time: {winnerTimeSec.toFixed(2)}s
-                </div>
-              </div>
+          <div style={{ margin: "12px 0 16px" }}>
+            <span style={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 700, letterSpacing: "1px" }}>YOU FINISHED</span>
+            <div style={{ fontSize: "2.8rem", fontWeight: 900, color: isFirstPlace ? "#fbbf24" : "#ffffff", margin: "4px 0" }}>
+              #{rankNum}
+            </div>
+            {isFirstPlace && (
+              <span className="room-code-badge" style={{ background: "rgba(245, 158, 11, 0.2)", color: "#fef08a", border: "1px solid rgba(245, 158, 11, 0.5)", fontSize: "0.8rem", padding: "4px 12px" }}>
+                ⚡ FASTEST COMPLETION
+              </span>
             )}
           </div>
 
           <div className="result-stats-row">
             <div className="result-stat-box">
-              <span className="stat-label">YOUR SOLVE TIME</span>
+              <span className="stat-label">SOLVE TIME</span>
               <strong className="stat-val" style={{ color: "#34d399" }}>
                 {Number(timeSec).toFixed(2)}s
               </strong>
             </div>
             <div className="result-stat-box">
-              <span className="stat-label">RANK POSITION</span>
+              <span className="stat-label">YOUR RANK</span>
               <strong className="stat-val" style={{ color: isFirstPlace ? "#fbbf24" : "#a78bfa" }}>
-                #{rankNum} / {totalComp}
+                #{rankNum}
               </strong>
             </div>
           </div>
@@ -1085,7 +1061,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           {roundCompleters.length > 0 && (
             <div style={{ marginTop: "16px", textAlign: "left", width: "100%" }}>
               <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 800, letterSpacing: "1px", marginBottom: "8px", textTransform: "uppercase" }}>
-                🏆 ROUND {gameState.round} LEADERBOARD ({roundCompleters.length} COMPLETED)
+                🏆 ROUND LEADERBOARD ({roundCompleters.length} COMPLETED)
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "160px", overflowY: "auto" }}>
                 {roundCompleters.map((res, idx) => {
@@ -1122,15 +1098,9 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           )}
 
           <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid rgba(255, 255, 255, 0.1)" }}>
-            {isEliminated ? (
-              <p style={{ color: "#f87171", fontWeight: 700, fontSize: "0.9rem" }}>
-                ❌ Eliminated in Round {gameState.round}
-              </p>
-            ) : (
-              <p style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>
-                ✓ Confirmed advancing to next round!
-              </p>
-            )}
+            <p style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>
+              ✓ Confirmed advancing to next round!
+            </p>
           </div>
 
           <div className="loader-spinner-purple" style={{ margin: "16px auto 0" }} />
@@ -1139,78 +1109,59 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
     );
   }
 
-  // 4. COMPLETED WAITING FOR ROUND END SCREEN
+  // 4. COMPLETED WAITING FOR ROUND END SCREEN (IMMEDIATE SOLVED SCREEN)
   if (effectiveStatus === "completed_waiting") {
-    const topWinnerObj = roundCompleters.length > 0 ? roundCompleters[0] : (roundLeaderboard.length > 0 ? roundLeaderboard[0] : null);
-    const winnerNameStr = topWinnerObj ? (topWinnerObj.name || topWinnerObj.player_name || "Player") : name;
-    const winnerTimeSec = topWinnerObj ? Number(topWinnerObj.completion_time || topWinnerObj.time || solveTimeRecord || 0) : Number(solveTimeRecord || 0);
-    const isMeWinner = !topWinnerObj || (topWinnerObj.player_id === playerId || topWinnerObj.id === playerId);
+    const timeDisplaySec = Number(solveTimeRecord || 0).toFixed(2);
 
     return (
       <div className="player-mobile-shell center-wrapper">
-        <div className="mobile-card glass-card result-card animate-pop" style={{ borderColor: isMeWinner ? "rgba(245, 158, 11, 0.6)" : "rgba(16, 185, 129, 0.5)" }}>
-          <div className="success-check-icon gold-glow" style={{ background: isMeWinner ? "rgba(245, 158, 11, 0.2)" : "rgba(16, 185, 129, 0.2)", border: isMeWinner ? "2px solid rgba(245, 158, 11, 0.6)" : "2px solid rgba(16, 185, 129, 0.6)", color: isMeWinner ? "#fbbf24" : "#34d399", fontSize: "2.5rem" }}>
-            {isMeWinner ? "🏆" : "✅"}
+        <div className="mobile-card glass-card result-card animate-pop" style={{ borderColor: "rgba(16, 185, 129, 0.6)" }}>
+          <div className="success-check-icon gold-glow" style={{ background: "rgba(16, 185, 129, 0.2)", border: "2px solid rgba(16, 185, 129, 0.6)", color: "#34d399", fontSize: "2.5rem" }}>
+            ✅
           </div>
-          <h1 className="joined-title" style={{ color: isMeWinner ? "#fbbf24" : "#34d399" }}>
-            {isMeWinner ? "YOU ARE THE WINNER!" : "PUZZLE COMPLETED!"}
+          <h1 className="joined-title" style={{ color: "#34d399" }}>
+            PUZZLE COMPLETE
           </h1>
+          <p style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f8fafc", margin: "6px 0 12px" }}>
+            Well done, {name}.
+          </p>
 
-          {/* CURRENT ROUND WINNER BANNER */}
           <div
             style={{
-              background: isMeWinner ? "linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(15, 23, 42, 0.7))" : "linear-gradient(135deg, rgba(124, 92, 255, 0.25), rgba(15, 23, 42, 0.7))",
-              border: isMeWinner ? "1px solid rgba(245, 158, 11, 0.6)" : "1px solid rgba(124, 92, 255, 0.5)",
+              background: "rgba(15, 23, 42, 0.7)",
+              border: "1px solid rgba(16, 185, 129, 0.4)",
               borderRadius: "14px",
-              padding: "14px 16px",
+              padding: "16px",
               margin: "12px 0 16px",
               textAlign: "center"
             }}
           >
-            {isMeWinner ? (
+            <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase" }}>
+              COMPLETED IN
+            </span>
+            <div style={{ fontSize: "2.5rem", fontWeight: 900, color: "#34d399", margin: "4px 0" }}>
+              {timeDisplaySec}s
+            </div>
+            <p style={{ color: "#cbd5e1", fontSize: "0.85rem", margin: "4px 0 0", fontWeight: 600 }}>
+              Your result has been recorded.
+            </p>
+          </div>
+
+          <div style={{ background: "rgba(124, 92, 255, 0.15)", border: "1px solid rgba(124, 92, 255, 0.3)", borderRadius: "12px", padding: "12px 16px", marginBottom: "16px" }}>
+            {myRank ? (
               <div>
-                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
-                  🏆 YOU ARE THE WINNER!
-                </div>
-                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
-                  👑 {name}
-                </div>
-                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
-                  ⏱️ Fastest Time: {Number(solveTimeRecord || winnerTimeSec).toFixed(2)}s
-                </div>
+                <span style={{ fontSize: "0.75rem", color: "#a78bfa", fontWeight: 800, letterSpacing: "1px" }}>LIVE RANKING</span>
+                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#fbbf24" }}>RANK #{myRank}</div>
               </div>
             ) : (
-              <div>
-                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
-                  🏆 ROUND {gameState.round} WINNER
-                </div>
-                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
-                  👑 {winnerNameStr}
-                </div>
-                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
-                  ⏱️ Winning Time: {winnerTimeSec.toFixed(2)}s
-                </div>
+              <div style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>
+                ⏳ Waiting for final ranking...
               </div>
             )}
           </div>
 
-          <div className="result-stats-row">
-            {solveTimeRecord !== null && (
-              <div className="result-stat-box">
-                <span className="stat-label">YOUR SOLVE TIME</span>
-                <strong className="stat-val" style={{ color: "#34d399" }}>{Number(solveTimeRecord).toFixed(2)}s</strong>
-              </div>
-            )}
-            {myRank && (
-              <div className="result-stat-box">
-                <span className="stat-label">ROUND RANK</span>
-                <strong className="stat-val" style={{ color: "#fbbf24" }}>#{myRank}</strong>
-              </div>
-            )}
-          </div>
-
-          <p className="sub-hint" style={{ marginTop: "16px", color: "#94a3b8", fontSize: "0.85rem" }}>
-            Great job! The host will evaluate advancement once all players finish or timer expires.
+          <p className="sub-hint" style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
+            Great job! Waiting for other players to finish...
           </p>
           <div className="loader-spinner-purple" style={{ margin: "16px auto 0" }} />
         </div>
