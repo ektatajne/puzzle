@@ -235,25 +235,23 @@ export function RankingView({ roomCode = "EXPO26", players = [], results = [], g
                         )}
                       </td>
                       <td>
-                        {player?.tournament_status === "WINNER" ? (
-                          <span className="status-badge px-2 py-0.5 rounded text-xs font-bold bg-amber-500/30 text-amber-300 border border-amber-400">
-                            👑 CHAMPION WINNER
-                          </span>
-                        ) : player?.tournament_status === "ELIMINATED" ? (
-                          <span className="status-badge px-2 py-0.5 rounded text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                            ❌ ELIMINATED (Rd {player?.eliminated_in_round || round})
-                          </span>
-                        ) : isCompleted ? (
-                          <span className="status-badge badge-completed px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            ✓ ADVANCED
-                          </span>
+                        {isCompleted ? (
+                          rank === 1 || player?.tournament_status === "WINNER" ? (
+                            <span className="status-badge px-2 py-0.5 rounded text-xs font-bold bg-amber-500/30 text-amber-300 border border-amber-400">
+                              👑 COMPLETED (#1 WINNER)
+                            </span>
+                          ) : (
+                            <span className="status-badge badge-completed px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              ✓ COMPLETED
+                            </span>
+                          )
                         ) : isRoundActive ? (
                           <span className="status-badge px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
                             IN PROGRESS
                           </span>
                         ) : (
                           <span className="status-badge px-2 py-0.5 rounded text-xs font-bold bg-rose-900/40 text-rose-300 border border-rose-700/30">
-                            ELIMINATED (DNF)
+                            ✕ ELIMINATED (TIME EXPIRED)
                           </span>
                         )}
                       </td>

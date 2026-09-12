@@ -155,8 +155,8 @@ export function PlayersView({
                       <td className="font-mono text-sm font-semibold text-slate-300">{empId}</td>
                       <td className="text-sm text-slate-300 font-medium">{unit}</td>
                       <td>
-                        <span className={`status-badge badge-${(player.status || "WAITING").toLowerCase()}`}>
-                          {player.status || "WAITING"}
+                        <span className={`status-badge badge-${(res || player.status === "COMPLETED" ? "COMPLETED" : player.status || "WAITING").toLowerCase()}`}>
+                          {res || player.status === "COMPLETED" ? "COMPLETED" : player.status || "WAITING"}
                         </span>
                       </td>
                       <td>

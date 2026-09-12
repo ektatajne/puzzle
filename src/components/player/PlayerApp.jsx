@@ -178,6 +178,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
         const myResult = dbResults ? dbResults.find((r) => r.player_id === initialSession.id || r.id === initialSession.id) : null;
         if (myResult) {
           setIsCompleted(true);
+          setTournamentStatus("ACTIVE");
           hasSubmittedResultRef.current = true;
           setMyRank(myResult.rank);
           setMyScore(myResult.score);
