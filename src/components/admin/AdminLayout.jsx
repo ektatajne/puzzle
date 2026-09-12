@@ -35,14 +35,7 @@ export function AdminLayout({
   onResetGame,
   onOpenDisplay
 }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try {
-      localStorage.removeItem("memoryrush_admin_auth");
-      return sessionStorage.getItem("memoryrush_admin_auth") === "true";
-    } catch (e) {
-      return false;
-    }
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const [activeTab, setActiveTabState] = useState(() => {
     try {
