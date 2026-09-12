@@ -41,7 +41,11 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
   });
 
   const channelRef = useRef(null);
+  const hasSubmittedResultRef = useRef(false);
+  const puzzleInitializedRoundRef = useRef(null);
+
   const [pieces, setPieces] = useState([]);
+  const [moveCount, setMoveCount] = useState(0);
   const [remainingSec, setRemainingSec] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [myRank, setMyRank] = useState(null);
@@ -254,12 +258,15 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
     channel.on("broadcast", { event: "game" }, ({ payload }) => {
       setGameState((prevGame) => {
-        // Reset local completion/result state if moving to a new round or starting a non-result phase
-        if (!prevGame || payload.round > prevGame.round || (payload.phase !== "RESULT" && payload.phase !== "FINAL_RESULTS" && payload.phase !== "ROUND_COMPLETE")) {
+        // Reset local completion/result state if moving to a new round
+        if (!prevGame || payload.round > prevGame.round) {
           setIsCompleted(false);
           setMyRank(null);
           setMyScore(null);
           setSolveTimeRecord(null);
+          setMoveCount(0);
+          hasSubmittedResultRef.current = false;
+          puzzleInitializedRoundRef.current = null;
         }
         return payload;
       });
@@ -274,10 +281,30 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       }
 
       if (payload.phase === "PUZZLE" && playerId && tournamentStatus !== "ELIMINATED") {
-        // Deterministic seeded shuffle per player: gameId + roundId + playerId
-        const seedStr = `${roomCode}-${payload.round}-${playerId}`;
-        const newPieces = createPuzzlePieces(payload.pieces || 16, seedStr);
-        setPieces(newPieces);
+        const pKey = `mr_puzzle_${roomCode}_${payload.round}_${playerId}`;
+        let restored = null;
+        try {
+          const raw = localStorage.getItem(pKey);
+          if (raw) restored = JSON.parse(raw);
+        } catch (e) {}
+
+        if (restored && restored.pieces && restored.pieces.length > 0) {
+          setPieces(restored.pieces);
+          if (typeof restored.moveCount === "number") setMoveCount(restored.moveCount);
+          if (restored.isCompleted) setIsCompleted(true);
+          if (restored.solveTime) setSolveTimeRecord(restored.solveTime);
+          puzzleInitializedRoundRef.current = payload.round;
+        } else if (puzzleInitializedRoundRef.current !== payload.round) {
+          // Deterministic seeded shuffle per player: gameId + roundId + playerId
+          const seedStr = `${roomCode}-${payload.round}-${playerId}`;
+          const newPieces = createPuzzlePieces(payload.pieces || 16, seedStr);
+          setPieces(newPieces);
+          setMoveCount(0);
+          puzzleInitializedRoundRef.current = payload.round;
+          try {
+            localStorage.setItem(pKey, JSON.stringify({ pieces: newPieces, moveCount: 0, isCompleted: false }));
+          } catch (e) {}
+        }
       }
     });
 
@@ -353,6 +380,8 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
   // Server authoritative timer calculation
   useEffect(() => {
+    if (isCompleted && solveTimeRecord !== null) return;
+
     const timer = setInterval(() => {
       if (!gameState.startAt) return;
       let durationSec = gameState.puzzle || 45;
@@ -364,7 +393,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       setRemainingSec(Math.max(0, (endMs - Date.now()) / 1000));
     }, 100);
     return () => clearInterval(timer);
-  }, [gameState]);
+  }, [gameState, isCompleted, solveTimeRecord]);
 
   // Join form submission
   const handleJoin = async (e) => {
@@ -471,15 +500,45 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
     const newPieces = [...pieces];
     [newPieces[i], newPieces[j]] = [newPieces[j], newPieces[i]];
+    const newMoveCount = moveCount + 1;
     setPieces(newPieces);
+    setMoveCount(newMoveCount);
 
-    if (isPuzzleSolved(newPieces)) {
+    const isSolved = isPuzzleSolved(newPieces);
+    const pKey = `mr_puzzle_${roomCode}_${gameState.round || 1}_${playerId}`;
+
+    try {
+      localStorage.setItem(
+        pKey,
+        JSON.stringify({
+          pieces: newPieces,
+          moveCount: newMoveCount,
+          isCompleted: isSolved,
+          solveTime: solveTimeRecord
+        })
+      );
+    } catch (e) {}
+
+    if (isSolved && !hasSubmittedResultRef.current) {
+      hasSubmittedResultRef.current = true;
       const solveTime = Math.max(0.5, (Date.now() - (gameState.startAt || Date.now())) / 1000);
       const currentRoundNum = gameState.round || 1;
 
-      // 1. Instantly set local completion state
+      // 1. Instantly set local completion state & stop timer
       setIsCompleted(true);
       setSolveTimeRecord(solveTime);
+
+      try {
+        localStorage.setItem(
+          pKey,
+          JSON.stringify({
+            pieces: newPieces,
+            moveCount: newMoveCount,
+            isCompleted: true,
+            solveTime: solveTime
+          })
+        );
+      } catch (e) {}
 
       // 2. Instantly broadcast finish event so host & display know immediately
       if (channelRef.current) {
@@ -494,6 +553,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
             round_number: currentRoundNum,
             time: solveTime,
             completion_time: solveTime,
+            moves: newMoveCount,
             score: 100,
             rank: 1,
             completedAt: new Date().toISOString()
