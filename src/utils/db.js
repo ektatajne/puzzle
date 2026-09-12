@@ -293,7 +293,23 @@ export async function saveRoundResultInDb({
   if (!playerId || !time) return null;
 
   try {
-    // 1. Calculate authoritative rank by counting existing DB results for this room & round
+    // 1. IDEMPOTENCY GUARD: Check if player ALREADY has a recorded result for this round
+    if (supabase) {
+      const { data: existingRecord } = await supabase
+        .from("round_results")
+        .select("*")
+        .eq("room_code", roomCode)
+        .eq("round_number", roundNumber)
+        .eq("player_id", playerId)
+        .maybeSingle();
+
+      if (existingRecord) {
+        // Player already finalized result. Return existing record without overwriting!
+        return existingRecord;
+      }
+    }
+
+    // 2. Calculate authoritative rank by counting existing DB results for this room & round
     let existingCount = 0;
     if (supabase) {
       const { data: existingResults } = await supabase
@@ -322,7 +338,7 @@ export async function saveRoundResultInDb({
     };
 
     if (supabase) {
-      // Upsert/Insert result into round_results table in Postgres
+      // Insert result into round_results table in Postgres
       const { data, error } = await supabase
         .from("round_results")
         .insert(newRecord)
@@ -333,20 +349,23 @@ export async function saveRoundResultInDb({
         handleDbNotice("saveRoundResultInDb Postgres insert notice", error);
       }
 
-      // Update total_score in players table for this player
+      // Update total_score & status in players table for this player
       const { data: player } = await supabase
         .from("players")
-        .select("total_score")
+        .select("total_score, tournament_status")
         .eq("id", playerId)
         .maybeSingle();
 
       const currentTotal = player?.total_score || 0;
+      const currentTourneyStatus = player?.tournament_status || "ACTIVE";
+      const newTourneyStatus = currentTourneyStatus === "WINNER" ? "WINNER" : "ACTIVE";
 
       await supabase
         .from("players")
         .update({
           total_score: currentTotal + score,
           status: "COMPLETED",
+          tournament_status: newTourneyStatus,
           last_seen_at: new Date().toISOString()
         })
         .eq("id", playerId);
@@ -382,7 +401,10 @@ export async function resetRoomPlayersInDb(roomCode = "EXPO26") {
 }
 
 /**
- * Evaluate knockout tournament eliminations for a round
+ * Evaluate tournament round results
+ * RULE: Any player who successfully completes the puzzle BEFORE timer expiry is COMPLETED & ADVANCES.
+ * They are NEVER eliminated!
+ * Only players who timed out without completing are ELIMINATED (TIME_EXPIRED).
  */
 export async function evaluateTournamentRound({
   roomCode = "EXPO26",
@@ -390,7 +412,7 @@ export async function evaluateTournamentRound({
   allPlayers = [],
   roundResults = []
 }) {
-  // 1. Identify players who were active coming into this round (not eliminated in previous rounds)
+  // 1. Identify players who were active coming into this round
   const roundActivePlayers = allPlayers.filter((p) => {
     const tourneyStatus = p.tournament_status || "ACTIVE";
     return tourneyStatus === "ACTIVE" || tourneyStatus === "ADVANCED";
@@ -442,84 +464,66 @@ export async function evaluateTournamentRound({
   // Sort completed list by solve time ascending (fastest first = rank 1)
   completedList.sort((a, b) => a.time - b.time);
 
-  let advancing = [];
-  let eliminated = [];
+  // RULE: ALL COMPLETED PLAYERS ADVANCE!
+  const advancing = completedList.map((item) => item.player);
+  // ONLY TIMED OUT PLAYERS ARE ELIMINATED!
+  let eliminated = timedOutList;
   let finalWinner = null;
 
-  // STEP 3c GUARD: Check if only 1 active player remains or if 1 solver finished
-  if (roundActivePlayers.length === 1) {
-    finalWinner = roundActivePlayers[0];
-    advancing = [finalWinner];
-    eliminated = [];
-  } else if (completedList.length === 1 && timedOutList.length === roundActivePlayers.length - 1) {
-    // Exactly 1 player completed in time while all other active players timed out -> WINNER!
+  // Determine final winner guard (e.g. if single active player or single solver remaining)
+  if (roundActivePlayers.length === 1 && completedList.length > 0) {
     finalWinner = completedList[0].player;
-    advancing = [finalWinner];
-    eliminated = timedOutList;
-  } else if (timedOutList.length > 0) {
-    // 1+ players timed out -> ALL solvers advance, timed out players are eliminated
-    advancing = completedList.map((item) => item.player);
-    eliminated = timedOutList;
-  } else {
-    // 100% of active players completed -> Eliminate single slowest solver
-    if (completedList.length > 1) {
-      advancing = completedList.slice(0, completedList.length - 1).map((item) => item.player);
-      eliminated = [completedList[completedList.length - 1].player];
-    } else {
-      finalWinner = completedList[0].player;
-      advancing = [finalWinner];
-      eliminated = [];
-    }
+  } else if (completedList.length === 1 && timedOutList.length === roundActivePlayers.length - 1) {
+    finalWinner = completedList[0].player;
   }
 
-  // Check final winner guard: if advancing pool has shrunk to 1 player and total participants > 1
-  if (!finalWinner && advancing.length === 1 && (allPlayers.length > 1 || roundActivePlayers.length > 1 || roundNumber > 1)) {
-    finalWinner = advancing[0];
-  }
+  // HARD GUARD: Completed players are NEVER in eliminated array!
+  eliminated = eliminated.filter((p) => {
+    const pIdLower = p.id ? p.id.toString().toLowerCase() : "";
+    const pNameLower = p.name ? p.name.toString().toLowerCase() : "";
+    return !completedList.some((c) => {
+      const cIdLower = c.player.id ? c.player.id.toString().toLowerCase() : "";
+      const cNameLower = c.player.name ? c.player.name.toString().toLowerCase() : "";
+      return (cIdLower && cIdLower === pIdLower) || (cNameLower && cNameLower === pNameLower);
+    });
+  });
 
-  // STEP 3c HARD GUARD: Ensure finalWinner is NEVER in eliminated array!
-  if (finalWinner) {
-    eliminated = eliminated.filter((p) => p.id !== finalWinner.id && p.name?.toLowerCase() !== finalWinner.name?.toLowerCase());
-    if (!advancing.some((p) => p.id === finalWinner.id)) {
-      advancing.push(finalWinner);
-    }
-  }
-
-  // STEP 3d: Write all updated statuses in a single database batch
+  // Write updated statuses in Postgres DB
   if (supabase) {
     try {
-      // Update winner
       if (finalWinner) {
         await supabase
           .from("players")
           .update({
             tournament_status: "WINNER",
             player_status: "tournament_winner",
+            status: "COMPLETED",
             last_seen_at: new Date().toISOString()
           })
           .eq("id", finalWinner.id);
       }
 
-      // Update advancing non-winners
-      for (const p of advancing) {
+      for (const item of completedList) {
+        const p = item.player;
         if (finalWinner && p.id === finalWinner.id) continue;
         await supabase
           .from("players")
           .update({
             tournament_status: "ACTIVE",
             player_status: "advancing",
+            status: "COMPLETED",
             last_seen_at: new Date().toISOString()
           })
           .eq("id", p.id);
       }
 
-      // Update eliminated
       for (const p of eliminated) {
         await supabase
           .from("players")
           .update({
             tournament_status: "ELIMINATED",
             player_status: "eliminated",
+            status: "ELIMINATED",
             eliminated_in_round: roundNumber,
             last_seen_at: new Date().toISOString()
           })

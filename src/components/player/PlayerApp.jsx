@@ -532,7 +532,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
   };
 
   const handleSwapPieces = async (i, j) => {
-    if (isCompleted || gameState.phase !== "PUZZLE" || !playerId) return;
+    if (isCompleted || gameState.phase !== "PUZZLE" || !playerId || remainingSec <= 0 || tournamentStatus === "ELIMINATED") return;
 
     const newPieces = [...pieces];
     [newPieces[i], newPieces[j]] = [newPieces[j], newPieces[i]];
@@ -557,7 +557,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
     if (isSolved && !hasSubmittedResultRef.current) {
       hasSubmittedResultRef.current = true;
-      const solveTime = Math.max(0.5, (Date.now() - (gameState.startAt || Date.now())) / 1000);
+      const solveTime = Math.max(0.1, (Date.now() - (gameState.startAt || Date.now())) / 1000);
       const currentRoundNum = gameState.round || 1;
 
       // 1. Instantly set local completion state & stop timer
@@ -657,34 +657,36 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       return "completed_waiting";
     }
 
-    // 3. RESULT / ROUND COMPLETE PHASE FOR NON-COMPLETERS
+    // 3. ELIMINATED (Only for non-completers)
+    if (tournamentStatus === "ELIMINATED") {
+      return "eliminated";
+    }
+
+    // 4. TIMER EXPIRED IN PUZZLE PHASE FOR NON-COMPLETERS
+    if (gameState.phase === "PUZZLE" && remainingSec <= 0 && gameState.startAt > 0) {
+      return "did_not_finish";
+    }
+
+    // 5. RESULT / ROUND COMPLETE PHASE FOR NON-COMPLETERS
     if (
       gameState.phase === "RESULT" ||
       gameState.phase === "ROUND_COMPLETE" ||
       gameState.phase === "FINAL_RESULTS"
     ) {
-      if (tournamentStatus === "ELIMINATED") {
-        return "eliminated";
-      }
       return "did_not_finish";
     }
 
-    // 4. ELIMINATED (Only for non-completers)
-    if (tournamentStatus === "ELIMINATED") {
-      return "eliminated";
-    }
-
-    // 5. PUZZLE PHASE PLAYING STATUS
+    // 6. PUZZLE PHASE PLAYING STATUS
     if (gameState.phase === "PUZZLE") {
       return "playing";
     }
 
-    // 6. PRE-REVEAL / MEMORY / COUNTDOWN PHASES
+    // 7. PRE-REVEAL / MEMORY / COUNTDOWN PHASES
     if (gameState.phase === "ROUND_STARTING") return "get_ready";
     if (gameState.phase === "MEMORY") return "memorizing";
     if (gameState.phase === "COUNTDOWN") return "countdown";
 
-    // 7. LOBBY / WAITING BETWEEN ROUNDS
+    // 8. LOBBY / WAITING BETWEEN ROUNDS
     if (gameState.phase === "LOBBY" || gameState.phase === "WAITING") {
       if (gameState.round > 1 && (tournamentStatus === "ACTIVE" || tournamentStatus === "ADVANCED")) {
         return "advancing";
@@ -1359,7 +1361,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           pieces={pieces}
           onSwapPieces={handleSwapPieces}
           onSelectTile={(idx) => setSelectedTileIdx(idx)}
-          disabled={isCompleted}
+          disabled={isCompleted || remainingSec <= 0 || tournamentStatus === "ELIMINATED"}
         />
 
         {/* PEEK TARGET IMAGE HINT MODAL */}

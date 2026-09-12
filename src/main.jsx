@@ -121,10 +121,30 @@ function RootApp() {
 
     setPlayers((prev) =>
       prev.map((p) => {
-        const isWinner = finalWinner && (p.id === finalWinner.id || p.id === finalWinner.player_id);
-        const isEliminated = eliminatedPlayers.some((e) => e.id === p.id);
-        if (isWinner) return { ...p, tournament_status: "WINNER" };
-        if (isEliminated) return { ...p, tournament_status: "ELIMINATED", eliminated_in_round: roundNum };
+        const pId = (p.id || p.player_id || "").toString().toLowerCase();
+        const pName = (p.name || p.player_name || "").toString().toLowerCase();
+
+        const isCompletedPlayer = combinedResults.some((r) => {
+          const rId = (r.player_id || r.id || "").toString().toLowerCase();
+          const rName = (r.player_name || r.name || "").toString().toLowerCase();
+          return (rId && rId === pId) || (rName && rName === pName);
+        });
+
+        const isWinner = finalWinner && (
+          (finalWinner.id && finalWinner.id.toString().toLowerCase() === pId) ||
+          (finalWinner.player_id && finalWinner.player_id.toString().toLowerCase() === pId) ||
+          (finalWinner.name && finalWinner.name.toString().toLowerCase() === pName)
+        );
+
+        const isEliminated = !isCompletedPlayer && eliminatedPlayers.some((e) => {
+          const eId = (e.id || e.player_id || "").toString().toLowerCase();
+          const eName = (e.name || e.player_name || "").toString().toLowerCase();
+          return (eId && eId === pId) || (eName && eName === pName);
+        });
+
+        if (isWinner) return { ...p, status: "COMPLETED", tournament_status: "WINNER" };
+        if (isCompletedPlayer) return { ...p, status: "COMPLETED", tournament_status: p.tournament_status === "WINNER" ? "WINNER" : "ACTIVE" };
+        if (isEliminated) return { ...p, status: "ELIMINATED", tournament_status: "ELIMINATED", eliminated_in_round: roundNum };
         return { ...p, tournament_status: "ACTIVE" };
       })
     );

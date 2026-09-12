@@ -584,42 +584,86 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
         <div className="stage-content stage-result-layout">
           <div className="result-hero-header">
             <span className="stage-badge">ROUND {gameState.round} COMPLETE</span>
-            <h1 className="stage-hero-heading">ROUND {gameState.round} PODIUM</h1>
+            <h1 className="stage-hero-heading">ROUND {gameState.round} RESULTS</h1>
           </div>
 
           {results.length > 0 ? (
-            <div className="podium-container glass-card">
-              {results[1] && (
-                <div className="podium-pillar pillar-2">
-                  <div className="podium-medal">🥈</div>
-                  <div className="podium-name">{results[1].name || results[1].player_name}</div>
-                  <div className="podium-time">{Number(results[1].time || results[1].completion_time).toFixed(2)}s</div>
-                  <div className="podium-score">+{results[1].score || 80} PTS OFFICIAL</div>
-                </div>
-              )}
+            <>
+              <div className="podium-container glass-card">
+                {results[1] && (
+                  <div className="podium-pillar pillar-2">
+                    <div className="podium-medal">🥈</div>
+                    <div className="podium-name">{results[1].name || results[1].player_name}</div>
+                    <div className="podium-time">{Number(results[1].time || results[1].completion_time).toFixed(1)}s</div>
+                    <div className="podium-score">+{results[1].score || 80} PTS OFFICIAL</div>
+                  </div>
+                )}
 
-              <div className="podium-pillar pillar-1">
-                <div className="podium-crown">👑</div>
-                <div className="podium-medal">🥇</div>
-                <div className="podium-name">{results[0].name || results[0].player_name}</div>
-                <div className="podium-time">{Number(results[0].time || results[0].completion_time).toFixed(2)}s</div>
-                <div className="podium-score gold">+{results[0].score || 100} PTS OFFICIAL</div>
+                <div className="podium-pillar pillar-1">
+                  <div className="podium-crown">👑</div>
+                  <div className="podium-medal">🥇</div>
+                  <div className="podium-name">{results[0].name || results[0].player_name}</div>
+                  <div className="podium-time">{Number(results[0].time || results[0].completion_time).toFixed(1)}s</div>
+                  <div className="podium-score gold">+{results[0].score || 100} PTS OFFICIAL</div>
+                </div>
+
+                {results[2] && (
+                  <div className="podium-pillar pillar-3">
+                    <div className="podium-medal">🥉</div>
+                    <div className="podium-name">{results[2].name || results[2].player_name}</div>
+                    <div className="podium-time">{Number(results[2].time || results[2].completion_time).toFixed(1)}s</div>
+                    <div className="podium-score">+{results[2].score || 65} PTS OFFICIAL</div>
+                  </div>
+                )}
               </div>
 
-              {results[2] && (
-                <div className="podium-pillar pillar-3">
-                  <div className="podium-medal">🥉</div>
-                  <div className="podium-name">{results[2].name || results[2].player_name}</div>
-                  <div className="podium-time">{Number(results[2].time || results[2].completion_time).toFixed(2)}s</div>
-                  <div className="podium-score">+{results[2].score || 65} PTS OFFICIAL</div>
+              {/* FULL COMPLETED LEADERBOARD LIST */}
+              {results.length > 3 && (
+                <div className="stage-leaderboard-panel glass-card" style={{ marginTop: "20px" }}>
+                  <div className="panel-title-row">
+                    <h3>📊 ALL COMPLETED PLAYERS ({results.length})</h3>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "10px", marginTop: "10px" }}>
+                    {results.slice(3).map((res, idx) => (
+                      <div key={res.id || idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: "rgba(255, 255, 255, 0.05)", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.1)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span style={{ fontWeight: 900, color: "#a78bfa" }}>#{idx + 4}</span>
+                          <strong style={{ color: "#ffffff" }}>{res.name || res.player_name}</strong>
+                        </div>
+                        <span style={{ color: "#34d399", fontWeight: 800 }}>{Number(res.time || res.completion_time).toFixed(1)}s</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           ) : (
             <div className="empty-podium-box glass-card">
               <h3>No completions recorded for Round {gameState.round}</h3>
             </div>
           )}
+
+          {/* TIMED OUT / ELIMINATED SECTION */}
+          {(() => {
+            const uncompleted = players.filter(
+              (p) => !results.some((r) => r.player_id === p.id || r.id === p.id || r.player_name?.toLowerCase() === p.name?.toLowerCase())
+            );
+            if (uncompleted.length === 0) return null;
+            return (
+              <div className="glass-card" style={{ marginTop: "20px", padding: "16px 24px", borderColor: "rgba(239, 68, 68, 0.4)", background: "rgba(239, 68, 68, 0.08)" }}>
+                <h4 style={{ color: "#f87171", margin: "0 0 10px 0", fontSize: "0.95rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px" }}>
+                  ⏰ TIME EXPIRED / ELIMINATED ({uncompleted.length})
+                </h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {uncompleted.map((p, idx) => (
+                    <span key={p.id || idx} style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#fca5a5", padding: "4px 12px", borderRadius: "16px", fontSize: "0.85rem", fontWeight: 600 }}>
+                      {p.name} (Time Expired)
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="result-footer-banner">
             <span>WAITING FOR HOST TO START NEXT ROUND...</span>
