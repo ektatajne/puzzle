@@ -353,18 +353,31 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
     // Handle personal & room finish events
     channel.on("broadcast", { event: "finish" }, ({ payload }) => {
+      if (!payload) return;
+      const resObj = {
+        ...payload,
+        name: payload.name || payload.player_name,
+        player_name: payload.name || payload.player_name,
+        time: Number(payload.time || payload.completion_time || 0),
+        completion_time: Number(payload.time || payload.completion_time || 0)
+      };
+
       setRoomLeaderboard((prev) => {
-        if (prev.some((item) => item.id === payload.id || (item.player_id === payload.player_id && item.player_id))) return prev;
-        const updated = [...prev, payload].sort((a, b) => (a.time || a.completion_time) - (b.time || b.completion_time));
-        return updated;
+        if (prev.some((item) => item.id === resObj.id || (item.player_id === resObj.player_id && item.player_id))) return prev;
+        return [...prev, resObj].sort((a, b) => a.time - b.time);
+      });
+
+      setRoundCompleters((prev) => {
+        if (prev.some((item) => item.id === resObj.id || (item.player_id === resObj.player_id && item.player_id))) return prev;
+        return [...prev, resObj].sort((a, b) => a.time - b.time);
       });
 
       // Strict filter: Only mark completed if the event matches THIS player's ID!
-      if (playerId && (payload.id === playerId || payload.player_id === playerId)) {
+      if (playerId && (resObj.id === playerId || resObj.player_id === playerId)) {
         setIsCompleted(true);
-        if (payload.rank) setMyRank(payload.rank);
-        if (payload.score) setMyScore(payload.score);
-        if (payload.time || payload.completion_time) setSolveTimeRecord(payload.time || payload.completion_time);
+        if (resObj.rank) setMyRank(resObj.rank);
+        if (resObj.score) setMyScore(resObj.score);
+        if (resObj.time) setSolveTimeRecord(resObj.time);
       }
     });
 
