@@ -31,10 +31,39 @@ export function LiveGameView({
       : 0;
   const eliminatedCount = players.filter((p) => p.tournament_status === "ELIMINATED").length;
 
+  const currentRoundWinner = results.length > 0 ? results[0] : null;
+
   return (
     <div className="live-game-view">
+      {/* ROUND WINNER BANNER FOR ADMIN DASHBOARD */}
+      {currentRoundWinner && (
+        <div className="glass-card gold-glow animate-pop" style={{ padding: "20px 28px", marginBottom: "20px", borderColor: "#fbbf24", background: "rgba(245, 158, 11, 0.18)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <span className="status-badge-chip" style={{ background: "#fbbf24", color: "#000", fontWeight: 900, fontSize: "0.85rem", padding: "4px 12px", borderRadius: "999px" }}>
+                🏆 ROUND {gameState.round} WINNER (FASTEST SOLVER)
+              </span>
+              <h2 style={{ fontSize: "1.8rem", color: "#fbbf24", margin: "8px 0 4px", fontWeight: 900 }}>
+                👑 {currentRoundWinner.name || currentRoundWinner.player_name}
+              </h2>
+              <div style={{ display: "flex", gap: "16px", color: "#f8fafc", fontSize: "0.95rem", fontWeight: 700 }}>
+                <span>⏱️ Solve Time: <strong style={{ color: "#34d399" }}>{Number(currentRoundWinner.time || currentRoundWinner.completion_time || 0).toFixed(2)}s</strong></span>
+                <span>•</span>
+                <span>🥇 Rank: <strong style={{ color: "#fbbf24" }}>#1 of {results.length} Completers</strong></span>
+              </div>
+            </div>
+            <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+              <span style={{ fontSize: "2.5rem" }}>🥇</span>
+              <span style={{ color: "#34d399", fontWeight: 800, fontSize: "0.85rem", background: "rgba(16, 185, 129, 0.2)", padding: "4px 10px", borderRadius: "8px" }}>
+                ✓ VERIFIED FASTEST SOLVER
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOURNAMENT COMPLETE WINNER BANNER FOR ADMIN */}
-      {isTournamentComplete && winnerPlayer && (
+      {isTournamentComplete && winnerPlayer && !currentRoundWinner && (
         <div className="glass-card gold-glow animate-pop" style={{ padding: "24px 32px", marginBottom: "20px", borderColor: "#fbbf24", background: "rgba(245, 158, 11, 0.15)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
             <div>
@@ -55,22 +84,6 @@ export function LiveGameView({
                 <span style={{ fontSize: "2rem" }}>👑</span>
                 <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.9rem" }}>CONGRATULATIONS!</div>
               </div>
-              <button
-                className="btn btn-danger btn-lg"
-                style={{
-                  fontWeight: 900,
-                  fontSize: "1rem",
-                  boxShadow: "0 0 15px rgba(239, 68, 68, 0.5)",
-                  cursor: "pointer"
-                }}
-                onClick={() => {
-                  if (window.confirm("Start a new game? This will finish the current game, clear room data, and allow fresh players to join.")) {
-                    onResetGame && onResetGame();
-                  }
-                }}
-              >
-                🚀 START NEW GAME
-              </button>
             </div>
           </div>
         </div>

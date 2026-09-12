@@ -527,24 +527,35 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
         );
       } catch (e) {}
 
+      const myResultObj = {
+        id: safeRandomUUID(),
+        player_id: playerId,
+        name: name,
+        player_name: name,
+        round_number: currentRoundNum,
+        time: solveTime,
+        completion_time: solveTime,
+        moves: newMoveCount,
+        score: 100,
+        completedAt: new Date().toISOString()
+      };
+
+      setRoomLeaderboard((prev) => {
+        const filtered = prev.filter((item) => item.player_id !== playerId && item.id !== playerId);
+        return [...filtered, myResultObj].sort((a, b) => (a.time || a.completion_time) - (b.time || b.completion_time));
+      });
+
+      setRoundCompleters((prev) => {
+        const filtered = prev.filter((item) => item.player_id !== playerId && item.id !== playerId);
+        return [...filtered, myResultObj].sort((a, b) => (a.time || a.completion_time) - (b.time || b.completion_time));
+      });
+
       // 2. Instantly broadcast finish event so host & display know immediately
       if (channelRef.current) {
         channelRef.current.send({
           type: "broadcast",
           event: "finish",
-          payload: {
-            id: safeRandomUUID(),
-            player_id: playerId,
-            name: name,
-            player_name: name,
-            round_number: currentRoundNum,
-            time: solveTime,
-            completion_time: solveTime,
-            moves: newMoveCount,
-            score: 100,
-            rank: 1,
-            completedAt: new Date().toISOString()
-          }
+          payload: myResultObj
         });
       }
 
