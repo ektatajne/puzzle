@@ -37,25 +37,25 @@ export function LiveGameView({
     <div className="live-game-view">
       {/* ROUND WINNER BANNER FOR ADMIN DASHBOARD */}
       {currentRoundWinner && (
-        <div className="glass-card gold-glow animate-pop" style={{ padding: "20px 28px", marginBottom: "20px", borderColor: "#fbbf24", background: "rgba(245, 158, 11, 0.18)" }}>
+        <div className="glass-card gold-glow animate-pop" style={{ padding: "24px 32px", marginBottom: "24px", borderColor: "#fbbf24", background: "linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(15, 23, 42, 0.8))" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
             <div>
-              <span className="status-badge-chip" style={{ background: "#fbbf24", color: "#000", fontWeight: 900, fontSize: "0.85rem", padding: "4px 12px", borderRadius: "999px" }}>
+              <span className="status-badge-chip" style={{ background: "#fbbf24", color: "#000", fontWeight: 900, fontSize: "0.85rem", padding: "4px 14px", borderRadius: "999px", letterSpacing: "1px" }}>
                 🏆 ROUND {gameState.round} WINNER (FASTEST SOLVER)
               </span>
-              <h2 style={{ fontSize: "1.8rem", color: "#fbbf24", margin: "8px 0 4px", fontWeight: 900 }}>
+              <h1 style={{ fontSize: "2.4rem", color: "#fbbf24", margin: "10px 0 6px", fontWeight: 900, letterSpacing: "1px", textShadow: "0 0 12px rgba(245, 158, 11, 0.5)" }}>
                 👑 {currentRoundWinner.name || currentRoundWinner.player_name}
-              </h2>
-              <div style={{ display: "flex", gap: "16px", color: "#f8fafc", fontSize: "0.95rem", fontWeight: 700 }}>
-                <span>⏱️ Solve Time: <strong style={{ color: "#34d399" }}>{Number(currentRoundWinner.time || currentRoundWinner.completion_time || 0).toFixed(2)}s</strong></span>
+              </h1>
+              <div style={{ display: "flex", gap: "20px", color: "#f8fafc", fontSize: "1.1rem", fontWeight: 800 }}>
+                <span>⏱️ FASTEST SOLVE TIME: <strong style={{ color: "#34d399", fontSize: "1.2rem" }}>{Number(currentRoundWinner.time || currentRoundWinner.completion_time || 0).toFixed(2)}s</strong></span>
                 <span>•</span>
-                <span>🥇 Rank: <strong style={{ color: "#fbbf24" }}>#1 of {results.length} Completers</strong></span>
+                <span>🥇 RANK: <strong style={{ color: "#fbbf24" }}>#1 OF {results.length} SOLVERS</strong></span>
               </div>
             </div>
-            <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
-              <span style={{ fontSize: "2.5rem" }}>🥇</span>
-              <span style={{ color: "#34d399", fontWeight: 800, fontSize: "0.85rem", background: "rgba(16, 185, 129, 0.2)", padding: "4px 10px", borderRadius: "8px" }}>
-                ✓ VERIFIED FASTEST SOLVER
+            <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+              <span style={{ fontSize: "3.5rem" }}>👑</span>
+              <span style={{ color: "#34d399", fontWeight: 900, fontSize: "0.9rem", background: "rgba(16, 185, 129, 0.25)", border: "1px solid rgba(16, 185, 129, 0.6)", padding: "4px 12px", borderRadius: "8px" }}>
+                ✓ VERIFIED #1 WINNER
               </span>
             </div>
           </div>

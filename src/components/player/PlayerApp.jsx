@@ -974,22 +974,37 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           {/* CURRENT ROUND WINNER BANNER */}
           <div
             style={{
-              background: isFirstPlace ? "rgba(245, 158, 11, 0.2)" : "rgba(124, 92, 255, 0.2)",
-              border: isFirstPlace ? "1px solid rgba(245, 158, 11, 0.5)" : "1px solid rgba(124, 92, 255, 0.4)",
-              borderRadius: "12px",
-              padding: "10px 14px",
-              margin: "10px 0 14px",
+              background: isFirstPlace ? "linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(15, 23, 42, 0.7))" : "linear-gradient(135deg, rgba(124, 92, 255, 0.25), rgba(15, 23, 42, 0.7))",
+              border: isFirstPlace ? "1px solid rgba(245, 158, 11, 0.6)" : "1px solid rgba(124, 92, 255, 0.5)",
+              borderRadius: "14px",
+              padding: "14px 16px",
+              margin: "12px 0 16px",
               textAlign: "center"
             }}
           >
             {isFirstPlace ? (
-              <div style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.95rem" }}>
-                🏆 You set the fastest time of <strong>{Number(timeSec).toFixed(2)}s</strong> in Round {gameState.round}!
+              <div>
+                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
+                  🏆 YOU ARE THE WINNER!
+                </div>
+                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
+                  👑 {name}
+                </div>
+                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
+                  ⏱️ Fastest Time: {Number(timeSec).toFixed(2)}s
+                </div>
               </div>
             ) : (
-              <div style={{ color: "#e2e8f0", fontSize: "0.9rem" }}>
-                <span style={{ color: "#fbbf24", fontWeight: 800 }}>🏆 Round Winner: </span>
-                <strong style={{ color: "#ffffff" }}>{winnerNameStr}</strong> ({winnerTimeSec.toFixed(2)}s)
+              <div>
+                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
+                  🏆 ROUND {gameState.round} WINNER
+                </div>
+                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
+                  👑 {winnerNameStr}
+                </div>
+                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
+                  ⏱️ Winning Time: {winnerTimeSec.toFixed(2)}s
+                </div>
               </div>
             )}
           </div>
@@ -1086,22 +1101,37 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           {/* CURRENT ROUND WINNER BANNER */}
           <div
             style={{
-              background: isMeWinner ? "rgba(245, 158, 11, 0.2)" : "rgba(124, 92, 255, 0.2)",
-              border: isMeWinner ? "1px solid rgba(245, 158, 11, 0.5)" : "1px solid rgba(124, 92, 255, 0.4)",
-              borderRadius: "12px",
-              padding: "10px 14px",
-              margin: "10px 0 14px",
+              background: isMeWinner ? "linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(15, 23, 42, 0.7))" : "linear-gradient(135deg, rgba(124, 92, 255, 0.25), rgba(15, 23, 42, 0.7))",
+              border: isMeWinner ? "1px solid rgba(245, 158, 11, 0.6)" : "1px solid rgba(124, 92, 255, 0.5)",
+              borderRadius: "14px",
+              padding: "14px 16px",
+              margin: "12px 0 16px",
               textAlign: "center"
             }}
           >
             {isMeWinner ? (
-              <div style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.95rem" }}>
-                🏆 You set the fastest time of <strong>{Number(solveTimeRecord || winnerTimeSec).toFixed(2)}s</strong> in Round {gameState.round}!
+              <div>
+                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
+                  🏆 YOU ARE THE WINNER!
+                </div>
+                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
+                  👑 {name}
+                </div>
+                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
+                  ⏱️ Fastest Time: {Number(solveTimeRecord || winnerTimeSec).toFixed(2)}s
+                </div>
               </div>
             ) : (
-              <div style={{ color: "#e2e8f0", fontSize: "0.9rem" }}>
-                <span style={{ color: "#fbbf24", fontWeight: 800 }}>🏆 Round Winner: </span>
-                <strong style={{ color: "#ffffff" }}>{winnerNameStr}</strong> ({winnerTimeSec.toFixed(2)}s)
+              <div>
+                <div style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.85rem", letterSpacing: "1px", textTransform: "uppercase" }}>
+                  🏆 ROUND {gameState.round} WINNER
+                </div>
+                <div style={{ color: "#ffffff", fontSize: "1.4rem", fontWeight: 900, margin: "4px 0" }}>
+                  👑 {winnerNameStr}
+                </div>
+                <div style={{ color: "#34d399", fontWeight: 800, fontSize: "0.95rem" }}>
+                  ⏱️ Winning Time: {winnerTimeSec.toFixed(2)}s
+                </div>
               </div>
             )}
           </div>
