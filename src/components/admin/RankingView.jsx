@@ -42,13 +42,23 @@ export function RankingView({ roomCode = "EXPO26", players = [], results = [], g
     });
 
     if (matchedResult || player.status === "COMPLETED") {
-      if (matchedResult) processedResultIds.add(matchedResult.id || matchedResult.player_id);
+      if (matchedResult) {
+        if (matchedResult.id) processedResultIds.add(matchedResult.id.toString().toLowerCase());
+        if (matchedResult.player_id) processedResultIds.add(matchedResult.player_id.toString().toLowerCase());
+      }
+      if (pId) processedResultIds.add(pId);
+      if (pName) processedResultIds.add(pName);
+
+      const solveTimeVal = matchedResult
+        ? getTimeVal(matchedResult)
+        : Number(player.completion_time || player.time || 0) || 45;
+
       completedList.push({
         player,
         result: matchedResult,
         isCompleted: true,
         name: matchedResult ? getNameStr(matchedResult) : getNameStr(player),
-        time: matchedResult ? getTimeVal(matchedResult) : 45,
+        time: solveTimeVal,
         score: matchedResult?.score || 100,
         round: matchedResult ? getRoundNum(matchedResult) : (selectedRound !== "ALL" ? Number(selectedRound) : (gameState.round || 1))
       });

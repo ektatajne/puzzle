@@ -232,7 +232,8 @@ export async function fetchRoundResults(roomCode = "EXPO26", roundNumber = null,
     }
 
     if (activeGameId) {
-      query = query.eq("game_id", activeGameId);
+      // Include records matching activeGameId OR legacy null game_id records for this room
+      query = query.or(`game_id.eq.${activeGameId},game_id.is.null`);
     }
 
     const { data, error } = await query;
@@ -288,12 +289,19 @@ export async function saveRoundResultInDb({
   playerName,
   roomCode = "EXPO26",
   roundNumber = 1,
-  time
+  time,
+  gameId = null
 }) {
   if (!playerId || !time) return null;
 
   try {
     const solveTime = Number(Number(time).toFixed(2));
+    let activeGameId = gameId;
+
+    if (supabase && !activeGameId) {
+      const activeGame = await getOrCreateActiveGame(roomCode);
+      if (activeGame) activeGameId = activeGame.id;
+    }
 
     // 1. IDEMPOTENCY GUARD: Check if player ALREADY has a recorded result for this round
     if (supabase) {
@@ -306,6 +314,15 @@ export async function saveRoundResultInDb({
         .maybeSingle();
 
       if (existingRecord) {
+        // Also make sure players table has status COMPLETED
+        await supabase
+          .from("players")
+          .update({
+            status: "COMPLETED",
+            last_seen_at: new Date().toISOString()
+          })
+          .eq("id", playerId);
+
         return existingRecord;
       }
     }
@@ -329,8 +346,9 @@ export async function saveRoundResultInDb({
     const newRecord = {
       id: safeRandomUUID(),
       player_id: playerId,
-      player_name: playerName.trim(),
+      player_name: (playerName || "").trim(),
       room_code: roomCode,
+      game_id: activeGameId || null,
       round_number: roundNumber,
       completion_time: solveTime,
       score: score,
@@ -479,6 +497,32 @@ export async function evaluateTournamentRound({
     });
   });
 
+  // DB-LEVEL DOUBLE CHECK GUARD: Query round_results table directly before marking anyone ELIMINATED
+  if (supabase && eliminated.length > 0) {
+    try {
+      const { data: dbRoundRes } = await supabase
+        .from("round_results")
+        .select("player_id, player_name")
+        .eq("room_code", roomCode)
+        .eq("round_number", roundNumber);
+
+      if (dbRoundRes && dbRoundRes.length > 0) {
+        eliminated = eliminated.filter((p) => {
+          const pIdLower = (p.id || "").toString().toLowerCase();
+          const pNameLower = (p.name || "").toString().toLowerCase();
+          const hasDbResult = dbRoundRes.some((r) => {
+            const rIdLower = (r.player_id || "").toString().toLowerCase();
+            const rNameLower = (r.player_name || "").toString().toLowerCase();
+            return (rIdLower && rIdLower === pIdLower) || (rNameLower && rNameLower === pNameLower);
+          });
+          return !hasDbResult;
+        });
+      }
+    } catch (e) {
+      console.warn("DB round_results double check notice:", e);
+    }
+  }
+
   let finalWinner = null;
   if (roundActivePlayers.length === 1 && completedList.length > 0) {
     finalWinner = completedList[0].player;
@@ -516,6 +560,15 @@ export async function evaluateTournamentRound({
       }
 
       for (const p of eliminated) {
+        // Double check status in case player completed during evaluation window
+        const { data: pCheck } = await supabase
+          .from("players")
+          .select("status")
+          .eq("id", p.id)
+          .maybeSingle();
+
+        if (pCheck?.status === "COMPLETED") continue;
+
         await supabase
           .from("players")
           .update({

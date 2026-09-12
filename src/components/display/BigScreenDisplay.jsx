@@ -57,10 +57,11 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
   }, []);
 
   // Fetch initial active players & round results snapshot from Supabase Postgres DB (scoped by gameId)
+  // Fetch initial active players & round results snapshot from Supabase Postgres DB (scoped by gameId)
   const loadDbSnapshot = useCallback(async () => {
     const [dbPlayers, dbResults] = await Promise.all([
       fetchActivePlayers(roomCode, gameState.gameId),
-      fetchRoundResults(roomCode, null, gameState.gameId)
+      fetchRoundResults(roomCode, gameState.round || null, gameState.gameId)
     ]);
     if (dbPlayers) {
       setPlayers(dbPlayers);
@@ -73,8 +74,21 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
         }));
       }
     }
-    if (dbResults) setResults(dbResults);
-  }, [roomCode, gameState.gameId]);
+    if (dbResults && dbResults.length > 0) {
+      setResults((prev) => {
+        const map = new Map();
+        prev.forEach((r) => {
+          const k = (r.player_id || r.id || r.name || "").toString().toLowerCase();
+          if (k) map.set(k, r);
+        });
+        dbResults.forEach((r) => {
+          const k = (r.player_id || r.id || r.name || "").toString().toLowerCase();
+          if (k) map.set(k, r);
+        });
+        return Array.from(map.values()).sort((a, b) => Number(a.time || a.completion_time || 0) - Number(b.time || b.completion_time || 0));
+      });
+    }
+  }, [roomCode, gameState.gameId, gameState.round]);
 
   useEffect(() => {
     loadDbSnapshot();
@@ -144,12 +158,29 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
       };
 
       setResults((prev) => {
-        if (prev.some((r) => r.id === newResObj.id || (r.player_id === newResObj.player_id && r.player_id))) return prev;
-        return [...prev, newResObj].sort((a, b) => a.time - b.time);
+        const pIdLower = (newResObj.player_id || "").toString().toLowerCase();
+        const pNameLower = (newResObj.name || "").toString().toLowerCase();
+        if (prev.some((r) => {
+          const rId = (r.player_id || r.id || "").toString().toLowerCase();
+          const rName = (r.player_name || r.name || "").toString().toLowerCase();
+          return (rId && rId === pIdLower) || (rName && rName === pNameLower);
+        })) return prev;
+
+        return [...prev, newResObj].sort((a, b) => Number(a.time || a.completion_time || 0) - Number(b.time || b.completion_time || 0));
       });
 
       setPlayers((prev) =>
-        prev.map((p) => (p.id === newResObj.player_id ? { ...p, status: "COMPLETED" } : p))
+        prev.map((p) => {
+          const pId = (p.id || "").toString().toLowerCase();
+          const targetId = (newResObj.player_id || "").toString().toLowerCase();
+          const pName = (p.name || "").toString().toLowerCase();
+          const targetName = (newResObj.name || "").toString().toLowerCase();
+
+          if ((pId && pId === targetId) || (pName && pName === targetName)) {
+            return { ...p, status: "COMPLETED" };
+          }
+          return p;
+        })
       );
 
       triggerCelebration(newResObj);
@@ -271,25 +302,33 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
   };
 
   // Compute live combined telemetry leaderboard
-  const liveLeaderboard = players.map((player) => {
-    const playerResult = results.find(
-      (r) => r.player_id === player.id || r.player_name?.toLowerCase() === player.name?.toLowerCase()
-    );
+  const processedPlayerIds = new Set();
+  const liveLeaderboard = [];
 
-    if (playerResult) {
-      return {
+  players.forEach((player) => {
+    const pIdLower = (player.id || "").toString().toLowerCase();
+    const pNameLower = (player.name || "").toString().toLowerCase();
+
+    const playerResult = results.find((r) => {
+      const rId = (r.player_id || r.id || "").toString().toLowerCase();
+      const rName = (r.player_name || r.name || "").toString().toLowerCase();
+      return (rId && rId === pIdLower) || (rName && rName === pNameLower);
+    });
+
+    if (playerResult || player.status === "COMPLETED") {
+      if (playerResult) processedPlayerIds.add((playerResult.player_id || playerResult.id || "").toString().toLowerCase());
+      processedPlayerIds.add(pIdLower);
+      liveLeaderboard.push({
         id: player.id,
         name: player.name,
         status: "COMPLETED",
-        score: playerResult.score || 80,
-        time: playerResult.time || playerResult.completion_time || 0,
+        score: playerResult?.score || 100,
+        time: Number(playerResult?.time || playerResult?.completion_time || 0),
         isOfficial: true,
-        rank: playerResult.rank || 1
-      };
-    }
-
-    if (gameState.phase === "PUZZLE") {
-      return {
+        rank: playerResult?.rank || 1
+      });
+    } else if (gameState.phase === "PUZZLE") {
+      liveLeaderboard.push({
         id: player.id,
         name: player.name,
         status: player.connected ? "PLAYING" : "DISCONNECTED",
@@ -297,29 +336,43 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
         time: null,
         isOfficial: false,
         rank: null
-      };
+      });
+    } else {
+      liveLeaderboard.push({
+        id: player.id,
+        name: player.name,
+        status: player.tournament_status === "ELIMINATED" ? "ELIMINATED" : "WAITING",
+        score: 0,
+        time: null,
+        isOfficial: false,
+        rank: null
+      });
     }
+  });
 
-    return {
-      id: player.id,
-      name: player.name,
-      status: "WAITING",
-      score: 0,
-      time: null,
-      isOfficial: false,
-      rank: null
-    };
-  }).sort((a, b) => {
-    // 1. Completed players sorted by fast solve time
+  results.forEach((r) => {
+    const rKey = (r.player_id || r.id || "").toString().toLowerCase();
+    const rName = (r.player_name || r.name || "").toString().toLowerCase();
+    if ((rKey && !processedPlayerIds.has(rKey)) || (rName && !processedPlayerIds.has(rName))) {
+      liveLeaderboard.push({
+        id: r.player_id || r.id,
+        name: r.name || r.player_name || "Player",
+        status: "COMPLETED",
+        score: r.score || 100,
+        time: Number(r.time || r.completion_time || 0),
+        isOfficial: true,
+        rank: r.rank || 1
+      });
+    }
+  });
+
+  liveLeaderboard.sort((a, b) => {
     if (a.status === "COMPLETED" && b.status === "COMPLETED") return a.time - b.time;
     if (a.status === "COMPLETED") return -1;
     if (b.status === "COMPLETED") return 1;
-
-    // 2. Playing players sorted by projected score
     if (a.status === "PLAYING" && b.status === "PLAYING") return b.score - a.score;
     if (a.status === "PLAYING") return -1;
     if (b.status === "PLAYING") return 1;
-
     return 0;
   });
 
@@ -645,9 +698,16 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
 
           {/* TIMED OUT / ELIMINATED SECTION */}
           {(() => {
-            const uncompleted = players.filter(
-              (p) => !results.some((r) => r.player_id === p.id || r.id === p.id || r.player_name?.toLowerCase() === p.name?.toLowerCase())
-            );
+            const uncompleted = players.filter((p) => {
+              const pIdLower = (p.id || "").toString().toLowerCase();
+              const pNameLower = (p.name || "").toString().toLowerCase();
+              if (p.status === "COMPLETED") return false;
+              return !results.some((r) => {
+                const rId = (r.player_id || r.id || "").toString().toLowerCase();
+                const rName = (r.player_name || r.name || "").toString().toLowerCase();
+                return (rId && rId === pIdLower) || (rName && rName === pNameLower);
+              });
+            });
             if (uncompleted.length === 0) return null;
             return (
               <div className="glass-card" style={{ marginTop: "20px", padding: "16px 24px", borderColor: "rgba(239, 68, 68, 0.4)", background: "rgba(239, 68, 68, 0.08)" }}>

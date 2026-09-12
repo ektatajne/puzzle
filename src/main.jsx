@@ -77,8 +77,8 @@ function RootApp() {
     }
 
     // 2. Fetch fresh DB records & snapshot
-    const dbResults = await fetchRoundResults(roomCode, roundNum);
-    const freshPlayers = await fetchActivePlayers(roomCode);
+    const dbResults = await fetchRoundResults(roomCode, roundNum, gameStateRef.current?.gameId);
+    const freshPlayers = await fetchActivePlayers(roomCode, gameStateRef.current?.gameId);
     const activeSnapshot = freshPlayers.length > 0 ? freshPlayers : players;
 
     // 3. Robustly merge DB results AND in-memory socket broadcast results
@@ -124,11 +124,13 @@ function RootApp() {
         const pId = (p.id || p.player_id || "").toString().toLowerCase();
         const pName = (p.name || p.player_name || "").toString().toLowerCase();
 
-        const isCompletedPlayer = combinedResults.some((r) => {
-          const rId = (r.player_id || r.id || "").toString().toLowerCase();
-          const rName = (r.player_name || r.name || "").toString().toLowerCase();
-          return (rId && rId === pId) || (rName && rName === pName);
-        });
+        const isCompletedPlayer =
+          p.status === "COMPLETED" ||
+          combinedResults.some((r) => {
+            const rId = (r.player_id || r.id || "").toString().toLowerCase();
+            const rName = (r.player_name || r.name || "").toString().toLowerCase();
+            return (rId && rId === pId) || (rName && rName === pName);
+          });
 
         const isWinner = finalWinner && (
           (finalWinner.id && finalWinner.id.toString().toLowerCase() === pId) ||
@@ -136,7 +138,7 @@ function RootApp() {
           (finalWinner.name && finalWinner.name.toString().toLowerCase() === pName)
         );
 
-        const isEliminated = !isCompletedPlayer && eliminatedPlayers.some((e) => {
+        const isEliminated = !isCompletedPlayer && p.status !== "COMPLETED" && eliminatedPlayers.some((e) => {
           const eId = (e.id || e.player_id || "").toString().toLowerCase();
           const eName = (e.name || e.player_name || "").toString().toLowerCase();
           return (eId && eId === pId) || (eName && eName === pName);
@@ -145,7 +147,7 @@ function RootApp() {
         if (isWinner) return { ...p, status: "COMPLETED", tournament_status: "WINNER" };
         if (isCompletedPlayer) return { ...p, status: "COMPLETED", tournament_status: p.tournament_status === "WINNER" ? "WINNER" : "ACTIVE" };
         if (isEliminated) return { ...p, status: "ELIMINATED", tournament_status: "ELIMINATED", eliminated_in_round: roundNum };
-        return { ...p, tournament_status: "ACTIVE" };
+        return { ...p, status: p.status === "COMPLETED" ? "COMPLETED" : p.status, tournament_status: "ACTIVE" };
       })
     );
 
@@ -176,6 +178,35 @@ function RootApp() {
       addToast(`Round ${roundNum} finished! ${advancingPlayers.length} advanced, ${eliminatedPlayers.length} eliminated.`, "info");
     }
   }, [roomCode, players, results, gameState, addToast]);
+
+  // Auto-finalize round if all active non-eliminated players have completed
+  useEffect(() => {
+    if (gameState.phase !== "PUZZLE" || !gameState.startAt) return;
+
+    const activeParticipating = players.filter((p) => p.tournament_status !== "ELIMINATED");
+    if (activeParticipating.length > 0) {
+      const allCompleted = activeParticipating.every((p) => {
+        const pIdLower = (p.id || "").toString().toLowerCase();
+        const pNameLower = (p.name || "").toString().toLowerCase();
+        return (
+          p.status === "COMPLETED" ||
+          results.some((r) => {
+            const rId = (r.player_id || r.id || "").toString().toLowerCase();
+            const rName = (r.player_name || r.name || "").toString().toLowerCase();
+            return (rId && rId === pIdLower) || (rName && rName === pNameLower);
+          })
+        );
+      });
+
+      if (allCompleted) {
+        console.log("All active players completed the puzzle! Finalizing round...");
+        const timer = setTimeout(() => {
+          finishAndEvaluateRound(gameState.round);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [gameState.phase, gameState.round, gameState.startAt, players, results, finishAndEvaluateRound]);
 
   // Fetch or create initial active game ID from Supabase
   useEffect(() => {

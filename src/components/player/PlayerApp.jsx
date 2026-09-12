@@ -269,8 +269,8 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
     channel.on("broadcast", { event: "game" }, ({ payload }) => {
       setGameState((prevGame) => {
-        // Reset local completion/result state if moving to a new round
-        if (!prevGame || payload.round > prevGame.round) {
+        // Reset local completion/result state ONLY if moving to a NEW round
+        if (prevGame && payload.round > prevGame.round) {
           setIsCompleted(false);
           setMyRank(null);
           setMyScore(null);
@@ -305,7 +305,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           if (restored.isCompleted) setIsCompleted(true);
           if (restored.solveTime) setSolveTimeRecord(restored.solveTime);
           puzzleInitializedRoundRef.current = payload.round;
-        } else if (puzzleInitializedRoundRef.current !== payload.round) {
+        } else if (puzzleInitializedRoundRef.current !== payload.round && !isCompleted && !hasSubmittedResultRef.current) {
           // Deterministic seeded shuffle per player: gameId + roundId + playerId
           const seedStr = `${roomCode}-${payload.round}-${playerId}`;
           const newPieces = createPuzzlePieces(payload.pieces || 16, seedStr);
@@ -615,7 +615,8 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
         playerName: name,
         roomCode,
         roundNumber: currentRoundNum,
-        time: solveTime
+        time: solveTime,
+        gameId: gameState.gameId
       });
 
       if (authResult) {
@@ -646,9 +647,16 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       return "tournament_winner";
     }
 
-    // Local storage completion check guard
+    // Local storage & completion check guard
     const checkLocalCompleted = () => {
-      if (isCompleted || (solveTimeRecord !== null && solveTimeRecord > 0) || roundResultData) return true;
+      if (isCompleted || hasSubmittedResultRef.current || (solveTimeRecord !== null && solveTimeRecord > 0) || roundResultData) return true;
+      const pIdLower = playerId ? playerId.toString().toLowerCase() : "";
+      if (roundCompleters.some((r) => {
+        const rId = (r.player_id || r.id || "").toString().toLowerCase();
+        return rId && rId === pIdLower;
+      })) {
+        return true;
+      }
       try {
         const pKey = `mr_puzzle_${roomCode}_${gameState.round || 1}_${playerId}`;
         const raw = localStorage.getItem(pKey);
