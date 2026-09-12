@@ -1,0 +1,5 @@
+{
+  "name": "Image Prompt Accuracy Game",
+  "description": "An interactive game that rates your image prompt writing skills. An AI generates an image, and you write a prompt to replicate it. Your prompt is then analyzed for accuracy and quality.",
+  "requestFramePermissions": []
+}

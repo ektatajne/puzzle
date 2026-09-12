@@ -1,0 +1,22 @@
+{
+  "name": "memory-rush-expo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node -e \"console.log('\\n===================================================\\n⚠️  EXPO OPERATOR NOTICE:\\nAlways open the Admin Panel using the printed Network IP address (e.g. http://192.168.x.x:5173/admin), NEVER localhost.\\nThis guarantees the Join QR code encodes the Network IP address so mobile phones can connect over Wi-Fi!\\n===================================================\\n')\"",
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.2",
+    "vite": "^7.1.3"
+  }
+}
