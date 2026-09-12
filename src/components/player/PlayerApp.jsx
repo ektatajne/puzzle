@@ -920,6 +920,10 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
     const isFirstPlace = rankNum === 1;
     const isEliminated = tournamentStatus === "ELIMINATED";
 
+    const topWinnerObj = roundCompleters.length > 0 ? roundCompleters[0] : (roundLeaderboard.length > 0 ? roundLeaderboard[0] : null);
+    const winnerNameStr = topWinnerObj ? (topWinnerObj.name || topWinnerObj.player_name || "Player") : name;
+    const winnerTimeSec = topWinnerObj ? Number(topWinnerObj.completion_time || topWinnerObj.time || timeSec) : Number(timeSec);
+
     return (
       <div className="player-mobile-shell center-wrapper">
         <div
@@ -956,25 +960,27 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
             {isFirstPlace ? "YOU ARE THE WINNER!" : `ROUND RESULT — RANK #${rankNum}`}
           </h1>
 
-          <p style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc", margin: "8px 0 14px" }}>
-            {isFirstPlace
-              ? `🏆 Fastest Completion Time: ${Number(timeSec).toFixed(2)}s`
-              : "Great job! Puzzle successfully completed."}
-          </p>
-
+          {/* CURRENT ROUND WINNER BANNER */}
           <div
             style={{
-              background: "rgba(15, 23, 42, 0.6)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
+              background: isFirstPlace ? "rgba(245, 158, 11, 0.2)" : "rgba(124, 92, 255, 0.2)",
+              border: isFirstPlace ? "1px solid rgba(245, 158, 11, 0.5)" : "1px solid rgba(124, 92, 255, 0.4)",
               borderRadius: "12px",
-              padding: "12px 16px",
-              marginBottom: "16px",
-              fontSize: "0.95rem",
-              fontWeight: 700,
-              color: "#e2e8f0"
+              padding: "10px 14px",
+              margin: "10px 0 14px",
+              textAlign: "center"
             }}
           >
-            You finished <strong>#{rankNum}</strong> out of <strong>{totalComp}</strong> players who completed Round {gameState.round}
+            {isFirstPlace ? (
+              <div style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.95rem" }}>
+                🏆 You set the fastest time of <strong>{Number(timeSec).toFixed(2)}s</strong> in Round {gameState.round}!
+              </div>
+            ) : (
+              <div style={{ color: "#e2e8f0", fontSize: "0.9rem" }}>
+                <span style={{ color: "#fbbf24", fontWeight: 800 }}>🏆 Round Winner: </span>
+                <strong style={{ color: "#ffffff" }}>{winnerNameStr}</strong> ({winnerTimeSec.toFixed(2)}s)
+              </div>
+            )}
           </div>
 
           <div className="result-stats-row">
@@ -1051,16 +1057,43 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
   // 4. COMPLETED WAITING FOR ROUND END SCREEN
   if (effectiveStatus === "completed_waiting") {
+    const topWinnerObj = roundCompleters.length > 0 ? roundCompleters[0] : (roundLeaderboard.length > 0 ? roundLeaderboard[0] : null);
+    const winnerNameStr = topWinnerObj ? (topWinnerObj.name || topWinnerObj.player_name || "Player") : name;
+    const winnerTimeSec = topWinnerObj ? Number(topWinnerObj.completion_time || topWinnerObj.time || solveTimeRecord || 0) : Number(solveTimeRecord || 0);
+    const isMeWinner = topWinnerObj && (topWinnerObj.player_id === playerId || topWinnerObj.id === playerId);
+
     return (
       <div className="player-mobile-shell center-wrapper">
-        <div className="mobile-card glass-card result-card animate-pop" style={{ borderColor: "rgba(16, 185, 129, 0.5)" }}>
-          <div className="success-check-icon gold-glow" style={{ background: "rgba(16, 185, 129, 0.2)", border: "2px solid rgba(16, 185, 129, 0.6)", color: "#34d399", fontSize: "2.5rem" }}>
-            ✅
+        <div className="mobile-card glass-card result-card animate-pop" style={{ borderColor: isMeWinner ? "rgba(245, 158, 11, 0.6)" : "rgba(16, 185, 129, 0.5)" }}>
+          <div className="success-check-icon gold-glow" style={{ background: isMeWinner ? "rgba(245, 158, 11, 0.2)" : "rgba(16, 185, 129, 0.2)", border: isMeWinner ? "2px solid rgba(245, 158, 11, 0.6)" : "2px solid rgba(16, 185, 129, 0.6)", color: isMeWinner ? "#fbbf24" : "#34d399", fontSize: "2.5rem" }}>
+            {isMeWinner ? "🏆" : "✅"}
           </div>
-          <h1 className="joined-title" style={{ color: "#34d399" }}>PUZZLE COMPLETED!</h1>
-          <p style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc", margin: "10px 0 16px" }}>
-            Waiting for the round to end...
-          </p>
+          <h1 className="joined-title" style={{ color: isMeWinner ? "#fbbf24" : "#34d399" }}>
+            {isMeWinner ? "YOU ARE THE WINNER!" : "PUZZLE COMPLETED!"}
+          </h1>
+
+          {/* CURRENT ROUND WINNER BANNER */}
+          <div
+            style={{
+              background: isMeWinner ? "rgba(245, 158, 11, 0.2)" : "rgba(124, 92, 255, 0.2)",
+              border: isMeWinner ? "1px solid rgba(245, 158, 11, 0.5)" : "1px solid rgba(124, 92, 255, 0.4)",
+              borderRadius: "12px",
+              padding: "10px 14px",
+              margin: "10px 0 14px",
+              textAlign: "center"
+            }}
+          >
+            {isMeWinner ? (
+              <div style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.95rem" }}>
+                🏆 You set the fastest time of <strong>{Number(solveTimeRecord || winnerTimeSec).toFixed(2)}s</strong> in Round {gameState.round}!
+              </div>
+            ) : (
+              <div style={{ color: "#e2e8f0", fontSize: "0.9rem" }}>
+                <span style={{ color: "#fbbf24", fontWeight: 800 }}>🏆 Round Winner: </span>
+                <strong style={{ color: "#ffffff" }}>{winnerNameStr}</strong> ({winnerTimeSec.toFixed(2)}s)
+              </div>
+            )}
+          </div>
 
           <div className="result-stats-row">
             {solveTimeRecord !== null && (
