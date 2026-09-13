@@ -119,7 +119,11 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
           setRoomPlayerCount(active.length);
           const me = active.find((p) => p.id === playerId);
           if (me?.tournament_status) {
-            setTournamentStatus(me.tournament_status);
+            if (me.tournament_status === "ELIMINATED" && (me.status === "COMPLETED" || isCompleted || hasSubmittedResultRef.current)) {
+              setTournamentStatus("ACTIVE");
+            } else {
+              setTournamentStatus(me.tournament_status);
+            }
             if (me.eliminated_in_round) setEliminatedInRound(me.eliminated_in_round);
           }
         }
@@ -128,7 +132,7 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
       }
     }
     loadActiveRoomPlayers();
-  }, [roomCode, playerId, gameState.gameId]);
+  }, [roomCode, playerId, gameState.gameId, isCompleted]);
 
   // Session validation and auto-reconnect on initial page load/refresh
   useEffect(() => {
@@ -169,7 +173,11 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
         const playerRecord = activePlayers ? activePlayers.find((p) => p.id === initialSession.id) : null;
 
         if (playerRecord && playerRecord.tournament_status) {
-          setTournamentStatus(playerRecord.tournament_status);
+          if (playerRecord.tournament_status === "ELIMINATED" && (playerRecord.status === "COMPLETED" || isCompleted)) {
+            setTournamentStatus("ACTIVE");
+          } else {
+            setTournamentStatus(playerRecord.tournament_status);
+          }
           if (playerRecord.eliminated_in_round) setEliminatedInRound(playerRecord.eliminated_in_round);
         }
 
@@ -344,10 +352,10 @@ export function PlayerApp({ roomCode = "EXPO26" }) {
 
       if (isMeWinner) {
         setTournamentStatus("WINNER");
-      } else if (isMeEliminated) {
+      } else if (isMeEliminated && !isCompleted && !hasSubmittedResultRef.current && solveTimeRecord === null) {
         setTournamentStatus("ELIMINATED");
         setEliminatedInRound(payload.roundNumber || gameState.round || 1);
-      } else if (isMeAdvancing) {
+      } else if (isMeAdvancing || isCompleted || hasSubmittedResultRef.current) {
         setTournamentStatus("ACTIVE");
       }
     });

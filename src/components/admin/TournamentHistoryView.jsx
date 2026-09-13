@@ -153,8 +153,14 @@ export function TournamentHistoryView({ roomCode = "EXPO26", players = [], resul
                     </tr>
                   ) : (
                     activeInRound.map((player, idx) => {
-                      const res = roundRes.find((r) => r.player_id === player.id || r.id === player.id);
-                      const isEliminated = player.eliminated_in_round === rNum || (!res && player.tournament_status === "ELIMINATED");
+                      const res = roundRes.find((r) => {
+                        const rId = (r.player_id || r.id || "").toString().toLowerCase();
+                        const rName = (r.player_name || r.name || "").toString().toLowerCase();
+                        const pId = (player.id || "").toString().toLowerCase();
+                        const pName = (player.name || "").toString().toLowerCase();
+                        return (rId && rId === pId) || (rName && rName === pName);
+                      });
+                      const isEliminated = !res && player.status !== "COMPLETED" && (player.eliminated_in_round === rNum || player.tournament_status === "ELIMINATED");
                       const isWinner = player.tournament_status === "WINNER";
                       const empId = player.employee_id || player.employeeId || "—";
                       const unit = player.tcs_unit || player.tcsUnit || "—";
