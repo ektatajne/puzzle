@@ -640,6 +640,24 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
             <h1 className="stage-hero-heading">ROUND {gameState.round} RESULTS</h1>
           </div>
 
+          {results.length > 0 && (
+            <div className="glass-card gold-glow animate-pop" style={{ padding: "20px 32px", marginBottom: "20px", borderColor: "#fbbf24", background: "linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(15, 23, 42, 0.9))", textAlign: "center", borderRadius: "20px", width: "100%", maxWidth: "900px", margin: "0 auto 20px" }}>
+              <span className="status-badge-chip" style={{ background: "#fbbf24", color: "#000", fontWeight: 900, fontSize: "0.85rem", padding: "4px 16px", borderRadius: "999px", letterSpacing: "1px" }}>
+                🏆 ROUND {gameState.round} WINNER (FASTEST SOLVER)
+              </span>
+              <h1 style={{ fontSize: "2.8rem", color: "#fbbf24", margin: "10px 0 6px", fontWeight: 900, letterSpacing: "1px", textShadow: "0 0 20px rgba(251, 191, 36, 0.6)" }}>
+                👑 {results[0].name || results[0].player_name}
+              </h1>
+              <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "20px", color: "#ffffff", fontSize: "1.1rem", fontWeight: 800 }}>
+                <span>⏱️ SOLVE TIME: <strong style={{ color: "#34d399", fontSize: "1.2rem" }}>{Number(results[0].time || results[0].completion_time).toFixed(2)}s</strong></span>
+                <span>•</span>
+                <span>🥇 RANK: <strong style={{ color: "#fbbf24" }}>#1 FASTEST COMPLETER</strong></span>
+                <span>•</span>
+                <span>⭐ SCORE: <strong style={{ color: "#a78bfa" }}>+{results[0].score || 100} PTS</strong></span>
+              </div>
+            </div>
+          )}
+
           {results.length > 0 ? (
             <>
               <div className="podium-container glass-card">
