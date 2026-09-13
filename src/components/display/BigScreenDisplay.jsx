@@ -714,34 +714,7 @@ export function BigScreenDisplay({ roomCode = "EXPO26" }) {
             </div>
           )}
 
-          {/* TIMED OUT / ELIMINATED SECTION */}
-          {(() => {
-            const uncompleted = players.filter((p) => {
-              const pIdLower = (p.id || "").toString().toLowerCase();
-              const pNameLower = (p.name || "").toString().toLowerCase();
-              if (p.status === "COMPLETED") return false;
-              return !results.some((r) => {
-                const rId = (r.player_id || r.id || "").toString().toLowerCase();
-                const rName = (r.player_name || r.name || "").toString().toLowerCase();
-                return (rId && rId === pIdLower) || (rName && rName === pNameLower);
-              });
-            });
-            if (uncompleted.length === 0) return null;
-            return (
-              <div className="glass-card" style={{ marginTop: "20px", padding: "16px 24px", borderColor: "rgba(239, 68, 68, 0.4)", background: "rgba(239, 68, 68, 0.08)" }}>
-                <h4 style={{ color: "#f87171", margin: "0 0 10px 0", fontSize: "0.95rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px" }}>
-                  ⏰ TIME EXPIRED / ELIMINATED ({uncompleted.length})
-                </h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                  {uncompleted.map((p, idx) => (
-                    <span key={p.id || idx} style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#fca5a5", padding: "4px 12px", borderRadius: "16px", fontSize: "0.85rem", fontWeight: 600 }}>
-                      {p.name} (Time Expired)
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {/* RESULT FOOTER BANNER */}
 
           <div className="result-footer-banner">
             <span>WAITING FOR HOST TO START NEXT ROUND...</span>
